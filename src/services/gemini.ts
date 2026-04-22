@@ -1,70 +1,88 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { SYSTEM_PROMPT, AnalysisReport } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export async function analyzeStatement(text: string): Promise<AnalysisReport> {
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: [
-      {
+  // Grab the key from Vercel's environment variables (must be prefixed with VITE_)
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  if (!apiKey || apiKey === "dummy_key") {
+    throw new Error("Please set VITE_GEMINI_API_KEY in your Vercel Environment Variables");
+  }
+
+  // Communicate directly with Google's REST API, bypassing any SDK bugs
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: {
+        parts: [{ text: SYSTEM_PROMPT }]
+      },
+      contents: [{
         parts: [{ text: `Analyze the following bank statement text and provide a financial health report based on our system instructions:\n\n${text}` }]
+      }],
+      generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: {
+          type: "OBJECT",
+          properties: {
+            totalSpend: { type: "NUMBER" },
+            periodRange: { type: "STRING" },
+            categories: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  name: { type: "STRING" },
+                  total: { type: "NUMBER" },
+                  percentage: { type: "NUMBER" }
+                },
+                required: ["name", "total", "percentage"]
+              }
+            },
+            insights: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  type: { type: "STRING", enum: ["saving", "alert", "recommendation"] },
+                  title: { type: "STRING" },
+                  description: { type: "STRING" },
+                  impactUSD: { type: "NUMBER" }
+                },
+                required: ["type", "title", "description", "impactUSD"]
+              }
+            },
+            topVendors: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  name: { type: "STRING" },
+                  total: { type: "NUMBER" }
+                },
+                required: ["name", "total"]
+              }
+            },
+            monthOverMonthTrend: { type: "STRING" }
+          },
+          required: ["totalSpend", "periodRange", "categories", "insights", "topVendors"]
+        }
       }
-    ],
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          totalSpend: { type: Type.NUMBER },
-          periodRange: { type: Type.STRING },
-          categories: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                total: { type: Type.NUMBER },
-                percentage: { type: Type.NUMBER }
-              },
-              required: ["name", "total", "percentage"]
-            }
-          },
-          insights: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                type: { type: Type.STRING, enum: ["saving", "alert", "recommendation"] },
-                title: { type: Type.STRING },
-                description: { type: Type.STRING },
-                impactUSD: { type: Type.NUMBER }
-              },
-              required: ["type", "title", "description", "impactUSD"]
-            }
-          },
-          topVendors: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                total: { type: Type.NUMBER }
-              },
-              required: ["name", "total"]
-            }
-          },
-          monthOverMonthTrend: { type: Type.STRING }
-        },
-        required: ["totalSpend", "periodRange", "categories", "insights", "topVendors"]
-      }
-    }
+    })
   });
 
-  if (!response.text) {
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error?.message || "Failed to make request to Gemini");
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  
+  if (!content) {
     throw new Error("No response from AI");
   }
 
-  return JSON.parse(response.text) as AnalysisReport;
+  return JSON.parse(content) as AnalysisReport;
 }
