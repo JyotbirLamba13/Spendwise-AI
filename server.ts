@@ -31,9 +31,28 @@ async function startServer() {
       let text = '';
 
       if (originalname.toLowerCase().endsWith('.pdf')) {
-        // Handle PDF
-        const data = await pdf(buffer);
-        text = data.text;
+        try {
+          const data = await pdf(buffer);
+          text = data.text;
+          
+          // Check if extracted text is suspiciously short (usually indicates a scan/image)
+          if (!text || text.trim().length < 50) {
+            return res.status(400).json({ 
+              error: 'SCAN_DETECTED',
+              message: 'This PDF appears to be a scanned image. ClearSpend requires a text-based PDF or CSV to analyze transactions.' 
+            });
+          }
+        } catch (error: any) {
+          // Detect password protection (common error messages from pdf-parse/pdfjs)
+          const errorMessage = error.message || '';
+          if (errorMessage.includes('password') || errorMessage.includes('encrypted')) {
+            return res.status(401).json({ 
+              error: 'PASSWORD_REQUIRED',
+              message: 'This PDF is password protected.' 
+            });
+          }
+          throw error;
+        }
       } else if (originalname.toLowerCase().endsWith('.csv')) {
         // Handle CSV (send as text, Papaparse can handle it on frontend or here)
         text = buffer.toString('utf-8');
