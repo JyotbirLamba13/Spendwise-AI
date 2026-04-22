@@ -1,29 +1,28 @@
 import { SYSTEM_PROMPT, AnalysisReport } from "../types";
 
 export async function analyzeStatement(text: string): Promise<AnalysisReport> {
-  // Grab the key from Vercel's environment variables (must be prefixed with VITE_)
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   
   if (!apiKey || apiKey === "dummy_key") {
     throw new Error("Please set VITE_GEMINI_API_KEY in your Vercel Environment Variables");
   }
 
-  // Communicate directly with Google's REST API, bypassing any SDK bugs
+  // Use the stable 1.5 Flash model via the REST API
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      system_instruction: {
+      systemInstruction: {
         parts: [{ text: SYSTEM_PROMPT }]
       },
       contents: [{
         parts: [{ text: `Analyze the following bank statement text and provide a financial health report based on our system instructions:\n\n${text}` }]
       }],
       generationConfig: {
-        response_mime_type: "application/json",
-        response_schema: {
+        responseMimeType: "application/json",
+        responseSchema: {
           type: "OBJECT",
           properties: {
             totalSpend: { type: "NUMBER" },
@@ -45,7 +44,7 @@ export async function analyzeStatement(text: string): Promise<AnalysisReport> {
               items: {
                 type: "OBJECT",
                 properties: {
-                  type: { type: "STRING", enum: ["saving", "alert", "recommendation"] },
+                  type: { type: "STRING" }, 
                   title: { type: "STRING" },
                   description: { type: "STRING" },
                   impactUSD: { type: "NUMBER" }
