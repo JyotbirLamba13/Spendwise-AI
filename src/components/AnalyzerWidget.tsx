@@ -50,15 +50,36 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to parse file');
+        
+        // Handle specific technical rejection codes
+        if (data.error === 'PASSWORD_REQUIRED') {
+          setIsPasswordProtected(true);
+          throw new Error("This PDF is password-protected. Please enter the password below to continue.");
+        }
+        
+        if (data.error === 'SCAN_DETECTED') {
+          throw new Error("This PDF looks like an image or scan. Please upload a PDF with selectable text or a CSV file.");
+        }
+
+        throw new Error(data.message || data.error || 'Failed to parse file');
       }
 
       const { text } = await response.json();
-      const report = await analyzeStatement(text);
-      onReportGenerated(report);
+      
+      try {
+        const report = await analyzeStatement(text);
+        onReportGenerated(report);
+      } catch (aiErr: any) {
+        // Map the technical Gemini schema error to a friendly message
+        if (aiErr.message?.includes('pattern') || aiErr.message?.includes('schema')) {
+          throw new Error("We encountered a small formatting issue while analyzing your data. Please try uploading the file one more time.");
+        }
+        throw aiErr;
+      }
+
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Something went wrong during analysis.");
+      setError(err.message || "An unexpected error occurred during analysis.");
     } finally {
       setIsLoading(false);
     }
@@ -183,6 +204,18 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
              <PlayCircle size={18} />
              Try with Demo Data
            </button>
+        </div>
+
+        {/* Privacy Promise Reassurance */}
+        <div className="pt-6 border-t border-emerald-50 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50/50 rounded-full text-brand text-xs font-bold uppercase tracking-wider mb-3">
+            <Lock size={12} />
+            Privacy First Architecture
+          </div>
+          <p className="text-sm text-slate-500 leading-relaxed max-w-sm mx-auto">
+            Your financial data never leaves your device's memory for storage. 
+            We process statements on-the-fly and do not store your PDFs or transaction lists on any server.
+          </p>
         </div>
       </div>
     </div>
