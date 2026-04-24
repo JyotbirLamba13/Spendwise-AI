@@ -12,34 +12,20 @@ export async function analyzeStatement(text: string): Promise<AnalysisReport> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: SYSTEM_PROMPT }]
-      },
-      contents: [{
-        parts: [{ text: `Analyze this text. If it is NOT a bank statement, or if no transactions are visible, please respond with a JSON object containing an "error" field explaining why. Otherwise, provide the full report as requested:\n\n${text}` }]
-      }],
-      generationConfig: {
-        responseMimeType: "application/json",
-      }
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ parts: [{ text: `Analyze the following bank statement text and provide a financial health report based on our system instructions:\n\n${text}` }] }],
+      generationConfig: { responseMimeType: "application/json" }
     })
   });
 
   if (!response.ok) {
     const err = await response.json();
-    throw new Error(err.error?.message || "Cloud processing error. Please try again.");
+    throw new Error(err.error?.message || "Failed to make request to Gemini");
   }
 
   const data = await response.json();
   const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  
-  if (!content) throw new Error("No response from AI engine.");
+  if (!content) throw new Error("No response from AI");
 
-  const parsed = JSON.parse(content);
-  
-  // If the AI returned its own error message (e.g., "I can't read this")
-  if (parsed.error) {
-    throw new Error(parsed.error);
-  }
-
-  return parsed as AnalysisReport;
+  return JSON.parse(content) as AnalysisReport;
 }
