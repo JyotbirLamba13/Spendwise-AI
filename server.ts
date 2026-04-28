@@ -1,4 +1,3 @@
-// ... (Replace the entire /api/parse-document route in server.ts with this)
 app.post('/api/parse-document', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
