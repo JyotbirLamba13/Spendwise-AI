@@ -1,6 +1,6 @@
 export interface Currency {
-  symbol: string;  // e.g. '₹', '$', '€', '£'
-  code: string;    // e.g. 'INR', 'USD', 'EUR', 'GBP'
+  symbol: string;
+  code: string;
 }
 
 export interface Transaction {
@@ -30,9 +30,13 @@ export interface Vendor {
 
 export interface AnalysisReport {
   currency: Currency;
-  totalSpend: number;
+  totalSpend: number;       // true discretionary expenses only
+  totalIncome: number;      // all credits / salary / transfers in
+  investmentsTotal: number; // SIP + mutual funds + stocks + PPF + NPS etc.
   periodRange: string;
-  categories: SpendCategory[];
+  categories: SpendCategory[];          // discretionary spend categories
+  investmentCategories: SpendCategory[]; // SIP, MF, stocks etc. broken down
+  incomeSources: { name: string; total: number }[];
   insights: Insight[];
   topVendors: Vendor[];
   monthOverMonthTrend: string;
@@ -41,50 +45,60 @@ export interface AnalysisReport {
 export const SYSTEM_PROMPT = `
 You are a world-class financial analyst.
 
-Your job is to analyze bank statement text and return ONLY a valid JSON object.
+Analyze the bank statement and return ONLY a valid JSON object. No markdown, no explanation, no text outside JSON.
 
-STRICT RULES (VERY IMPORTANT):
-- Output ONLY valid JSON. No explanation. No markdown. No text outside JSON.
-- Do NOT wrap JSON in backticks.
-- Do NOT prefix with "Here is the analysis".
-- Ensure ALL fields are present.
-- If data is missing, still return the field with a reasonable default.
+━━━ CURRENCY ━━━
+Detect currency from symbols (₹ $ € £) or text (INR USD EUR GBP Rs.).
+Default: { "symbol": "$", "code": "USD" }
 
-CURRENCY DETECTION:
-- Detect the currency from the statement (look for symbols ₹, $, €, £, or text like INR, USD, EUR, GBP, Rs., etc.)
-- Return as: { "symbol": "₹", "code": "INR" }
-- Default to { "symbol": "$", "code": "USD" } if unclear
+━━━ INCOME ━━━
+- totalIncome: sum of ALL credit transactions (salary, transfers received, refunds, interest, dividends)
+- incomeSources: top income sources as [{ "name": "...", "total": 0 }]
 
-FIELD RULES:
-- currency: object with symbol and code
-- totalSpend: number (sum of all debits)
-- periodRange: string ("MM/YYYY - MM/YYYY")
-- categories: array of { name, total, percentage }
-- insights: array of { type, title, description, impactAmount, transactions }
-- topVendors: array of { name, total }
-- monthOverMonthTrend: string (ALWAYS include, even if "Insufficient data")
+━━━ INVESTMENTS (CRITICAL — read carefully) ━━━
+The following are INVESTMENTS / SAVINGS, NOT expenses the user can cut:
+  • SIP (Systematic Investment Plan)
+  • Mutual fund purchases
+  • Stock / equity purchases
+  • PPF, NPS, EPF contributions
+  • Insurance premiums (life, health)
+  • Recurring deposits, fixed deposits
+  • Any transaction labelled "invest", "SIP", "MF", "fund", "policy"
 
-INSIGHT RULES:
-- For each insight, include up to 5 relevant transactions that support it
-- transactions: array of { "date": "DD/MM/YYYY", "description": "...", "amount": 1234.56 }
-- impactAmount is in the detected currency (not always USD)
-- Keep insight descriptions concise and actionable
-- Use the correct currency symbol in descriptions (not always $)
+- investmentsTotal: sum of ALL investment transactions
+- investmentCategories: break them down as [{ "name": "SIP - Mutual Funds", "total": 0, "percentage": 0 }]
+- NEVER include investments in categories (spending)
+- NEVER suggest reducing investments in insights
+- NEVER flag SIP or mutual fund payments as something to cut
 
-LOGIC RULES:
-1. Categorize spend into logical groups (Food, Rent, Shopping, Travel, etc.)
-2. Identify unusual spending spikes
-3. Detect subscriptions or repeated payments
-4. Suggest savings opportunities with realistic impact in the detected currency
-5. Keep insights concise and actionable
+━━━ SPENDING ━━━
+- totalSpend: sum of truly discretionary expenses ONLY (exclude investments, exclude income)
+- categories: spending categories [{ "name": "Food", "total": 0, "percentage": 0 }]
+  Common categories: Food & Dining, Shopping, Rent & Housing, Travel, Entertainment, Utilities, Subscriptions, Healthcare, Education, Transfers Out
+- topVendors: top merchants by spend [{ "name": "...", "total": 0 }]
 
-OUTPUT FORMAT (STRICT):
+━━━ INSIGHTS ━━━
+- Focus ONLY on discretionary expenses where real savings are possible
+- Never suggest cutting SIP, investments, insurance, or loan EMIs
+- For each insight include up to 5 supporting transactions
+- impactAmount in the detected currency
+- transactions: [{ "date": "DD/MM/YYYY", "description": "...", "amount": 0 }]
+
+━━━ OUTPUT FORMAT ━━━
 {
   "currency": { "symbol": "₹", "code": "INR" },
+  "totalIncome": 0,
   "totalSpend": 0,
+  "investmentsTotal": 0,
   "periodRange": "01/2024 - 03/2024",
+  "incomeSources": [
+    { "name": "Salary - Employer", "total": 0 }
+  ],
   "categories": [
-    { "name": "Food", "total": 0, "percentage": 0 }
+    { "name": "Food & Dining", "total": 0, "percentage": 0 }
+  ],
+  "investmentCategories": [
+    { "name": "SIP - Mutual Funds", "total": 0, "percentage": 0 }
   ],
   "insights": [
     {
@@ -93,12 +107,12 @@ OUTPUT FORMAT (STRICT):
       "description": "Explanation",
       "impactAmount": 0,
       "transactions": [
-        { "date": "01/04/2026", "description": "Example transaction", "amount": 500 }
+        { "date": "01/04/2026", "description": "Example", "amount": 0 }
       ]
     }
   ],
   "topVendors": [
-    { "name": "Amazon", "total": 0 }
+    { "name": "Merchant", "total": 0 }
   ],
   "monthOverMonthTrend": "No clear trend"
 }
