@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Upload, FileText, Lock, Loader2, PlayCircle, AlertCircle, X } from 'lucide-react';
-import { analyzeStatement } from '../services/gemini';
+import { Upload, FileText, Lock, Loader2, PlayCircle, AlertCircle, X, Eye, EyeOff } from 'lucide-react';
 import { AnalysisReport } from '../types';
 import { cn } from '../lib/utils';
 import { SAMPLE_REPORT } from '../lib/sampleData';
@@ -14,6 +13,7 @@ interface AnalyzerWidgetProps {
 export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false }: AnalyzerWidgetProps) {
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [needsPassword, setNeedsPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +25,7 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
     setFile(selected);
     setError(null);
     setPassword('');
+    setShowPassword(false);
     setNeedsPassword(false);
   };
 
@@ -33,15 +34,8 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
     if (selected) selectFile(selected);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -65,11 +59,7 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
       formData.append('file', file);
       if (needsPassword && password) formData.append('password', password);
 
-      const response = await fetch('/api/parse-document', {
-        method: 'POST',
-        body: formData,
-      });
-
+      const response = await fetch('/api/parse-document', { method: 'POST', body: formData });
       const data = await response.json();
 
       if (!response.ok) {
@@ -81,18 +71,12 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
         if (data.error === 'SCAN_DETECTED') {
           throw new Error('This PDF looks like a scanned image. Please upload a text-based PDF or CSV.');
         }
-        throw new Error(data.message || data.error || 'Failed to parse file');
+        throw new Error(data.message || data.error || 'Failed to process file.');
       }
 
-      try {
-        const report = await analyzeStatement(data.text);
-        onReportGenerated(report);
-      } catch (aiErr: any) {
-        throw aiErr;
-      }
+      onReportGenerated(data.report);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Something went wrong.');
+      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -100,15 +84,13 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
 
   const tryWithDemo = () => {
     setIsLoading(true);
-    setTimeout(() => {
-      onReportGenerated(SAMPLE_REPORT);
-      setIsLoading(false);
-    }, 1500);
+    setTimeout(() => { onReportGenerated(SAMPLE_REPORT); setIsLoading(false); }, 1500);
   };
 
   const clearFile = () => {
     setFile(null);
     setPassword('');
+    setShowPassword(false);
     setNeedsPassword(false);
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -123,9 +105,7 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
           </div>
         </div>
         <h3 className="text-xl font-bold mb-2 text-slate-900">See the magic in action</h3>
-        <p className="text-slate-500 text-sm mb-5 max-w-sm mx-auto">
-          Try a sample dataset to see how analysis works.
-        </p>
+        <p className="text-slate-500 text-sm mb-5 max-w-sm mx-auto">Try a sample dataset to see how analysis works.</p>
         <button
           onClick={tryWithDemo}
           disabled={isLoading}
@@ -152,25 +132,12 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
             onDrop={handleDrop}
             className={cn(
               'border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all',
-              isDragging
-                ? 'border-brand bg-brand/5 scale-[1.01]'
-                : 'border-slate-200 hover:border-brand hover:bg-slate-50'
+              isDragging ? 'border-brand bg-brand/5 scale-[1.01]' : 'border-slate-200 hover:border-brand hover:bg-slate-50'
             )}
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.csv"
-              onChange={handleFileChange}
-            />
-            <Upload
-              className={cn('mx-auto mb-3 transition-colors', isDragging ? 'text-brand' : 'text-slate-400')}
-              size={28}
-            />
-            <p className="font-bold text-slate-700">
-              {isDragging ? 'Drop it here' : 'Drag & drop or click to upload'}
-            </p>
+            <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.csv" onChange={handleFileChange} />
+            <Upload className={cn('mx-auto mb-3 transition-colors', isDragging ? 'text-brand' : 'text-slate-400')} size={28} />
+            <p className="font-bold text-slate-700">{isDragging ? 'Drop it here' : 'Drag & drop or click to upload'}</p>
             <p className="text-sm text-slate-400 mt-1">PDF or CSV · Max 10MB</p>
           </div>
         ) : (
@@ -179,10 +146,7 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
               <FileText size={18} className="text-white" />
             </div>
             <span className="flex-1 truncate text-sm font-semibold text-slate-700">{file.name}</span>
-            <button
-              onClick={clearFile}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-emerald-100 text-slate-400 hover:text-slate-600 transition-colors"
-            >
+            <button onClick={clearFile} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-emerald-100 text-slate-400 hover:text-slate-600 transition-colors">
               <X size={16} />
             </button>
           </div>
@@ -191,28 +155,37 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
         {/* PASSWORD INPUT */}
         {needsPassword && (
           <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-            <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
+            <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-2xl p-3">
               <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-bold text-blue-800">This PDF is password protected</p>
                 <p className="text-xs text-blue-600 mt-0.5">Your password is used only to decrypt this file in memory. It is never stored, logged, or transmitted anywhere.</p>
               </div>
             </div>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && password && handleUpload()}
-              placeholder="Enter PDF password"
-              autoFocus
-              className="w-full p-3 border-2 border-slate-200 rounded-2xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand transition-colors bg-white"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && password && handleUpload()}
+                placeholder="Enter PDF password"
+                autoFocus
+                className="w-full p-3 pr-11 border-2 border-slate-200 rounded-2xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand transition-colors bg-white"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </motion.div>
         )}
 
         {/* ERROR */}
         {error && (
-          <div className="flex gap-2 items-start text-red-600 text-sm bg-red-50 border border-red-100 rounded-xl p-3">
+          <div className="flex gap-2 items-start text-red-600 text-sm bg-red-50 border border-red-100 rounded-2xl p-3">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -227,7 +200,6 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
           >
             {isLoading ? <Loader2 className="animate-spin" size={18} /> : 'Analyze'}
           </button>
-
           <button
             onClick={tryWithDemo}
             disabled={isLoading}
