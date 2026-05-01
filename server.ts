@@ -53,60 +53,44 @@ function safeJsonParse(text: string) {
 }
 
 async function analyzeWithGemini(text: string): Promise<AnalysisReport> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('Gemini API key is not configured on the server.');
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error('GROQ_API_KEY is not set in Render environment variables.');
 
   const cleanedText = text.slice(0, 12000);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ parts: [{ text: `Analyze this bank statement and return STRICT JSON only:\n\n${cleanedText}` }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `Analyze this bank statement and return STRICT JSON only:\n\n${cleanedText}` },
+        ],
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
       }),
     });
   } catch {
-    throw new Error('Could not reach the AI service. Check server internet access.');
+    throw new Error('Could not reach the AI service. Please try again.');
   }
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({})) as any;
     const msg = err?.error?.message || '';
-    const status = err?.error?.status || '';
-    console.error('Gemini API error — HTTP:', response.status, '| status:', status, '| message:', msg);
-
-    if (response.status === 429 || status === 'RESOURCE_EXHAUSTED') {
-      // Auto-retry once after 5 seconds
-      console.log('Rate limited — retrying in 5s...');
-      await new Promise(r => setTimeout(r, 5000));
-      const retry = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ parts: [{ text: `Analyze this bank statement and return STRICT JSON only:\n\n${cleanedText}` }] }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
-        }),
-      });
-      if (retry.ok) {
-        const retryData = await retry.json() as any;
-        const retryContent = retryData?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (retryContent) return safeJsonParse(retryContent) as AnalysisReport;
-      }
-      throw new Error('The AI service is rate-limited. Please wait 1 minute and try again.');
-    }
-    if (response.status === 401 || response.status === 403) throw new Error('Invalid Gemini API key. Go to Render → Environment and verify GEMINI_API_KEY is set correctly.');
-    if (msg.includes('not found') || msg.includes('deprecated')) throw new Error(`AI model unavailable: ${msg}`);
+    console.error('Groq API error — HTTP:', response.status, '|', msg);
+    if (response.status === 429) throw new Error('AI service is busy. Please wait a moment and try again.');
+    if (response.status === 401) throw new Error('Invalid Groq API key. Check GROQ_API_KEY in Render → Environment.');
     throw new Error(`AI request failed (${response.status}): ${msg || 'Please try again.'}`);
   }
 
   const data = await response.json() as any;
-  const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const content = data?.choices?.[0]?.message?.content;
   if (!content) throw new Error('AI returned an empty response. Please try again.');
 
   return safeJsonParse(content) as AnalysisReport;
