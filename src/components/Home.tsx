@@ -16,9 +16,8 @@ export default function Home() {
   const handleReportGenerated = (newReport: AnalysisReport) => {
     setReport(newReport);
     setIsAnalyzing(false);
-    // Smooth scroll to report
     setTimeout(() => {
-      document.getElementById('report-section')?.scrollIntoView({ behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
   };
 

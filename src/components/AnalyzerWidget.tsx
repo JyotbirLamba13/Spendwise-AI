@@ -140,14 +140,14 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
   // MAIN UI
   // =========================
   return (
-    <div className="bg-white rounded-[2rem] p-8 md:p-12 shadow-2xl border border-emerald-50">
-      <div className="space-y-8">
+    <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-2xl border border-emerald-50">
+      <div className="space-y-5">
 
         {/* FILE UPLOAD */}
         {!file ? (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer"
+            className="border-2 border-dashed border-slate-200 hover:border-brand rounded-2xl p-8 text-center cursor-pointer transition-colors"
           >
             <input
               ref={fileInputRef}
@@ -156,9 +156,9 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
               accept=".pdf,.csv"
               onChange={handleFileChange}
             />
-            <Upload className="mx-auto mb-4" />
-            <p className="font-bold">Upload your statement</p>
-            <p className="text-sm text-slate-400">PDF or CSV (Max 10MB)</p>
+            <Upload className="mx-auto mb-3 text-slate-400" size={28} />
+            <p className="font-bold text-slate-700">Upload your statement</p>
+            <p className="text-sm text-slate-400 mt-1">PDF or CSV · Max 10MB</p>
           </div>
         ) : (
           <div className="flex items-center gap-4 p-4 border rounded-xl">
