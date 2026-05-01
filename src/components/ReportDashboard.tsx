@@ -2,14 +2,14 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  DollarSign, AlertTriangle, Lightbulb, CheckCircle2,
-  Calendar, Building2, ChevronDown, Receipt, PiggyBank, Wallet,
+  AlertTriangle, Lightbulb, CheckCircle2,
+  Calendar, Building2, ChevronDown, Receipt, PiggyBank, Wallet, ListChecks,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { AnalysisReport, Insight, Currency } from '../types';
+import { AnalysisReport, Insight, Currency, SpendCategory } from '../types';
 import { cn } from '../lib/utils';
 
 interface Props { report: AnalysisReport }
@@ -184,8 +184,8 @@ export default function ReportDashboard({ report }: Props) {
 
           {/* Expense breakdown */}
           <h3 className="text-2xl font-bold tracking-tight text-slate-900">Expense Breakdown</h3>
-          <div className="bg-white p-6 rounded-3xl border border-emerald-50 shadow-sm space-y-4">
-            <div className="h-48 w-full">
+          <div className="bg-white p-6 rounded-3xl border border-emerald-50 shadow-sm space-y-2">
+            <div className="h-48 w-full mb-2">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={report.categories} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="total" stroke="none">
@@ -196,16 +196,7 @@ export default function ReportDashboard({ report }: Props) {
               </ResponsiveContainer>
             </div>
             {report.categories.map((cat, i) => (
-              <div key={i} className="flex justify-between text-sm font-bold items-center py-2 border-b border-slate-50 last:border-0 last:pb-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                  <span className="text-slate-600 truncate max-w-[120px]">{cat.name}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span>{fmt(cat.total, currency)}</span>
-                  <span className="text-xs text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{cat.percentage}%</span>
-                </div>
-              </div>
+              <CategoryRow key={i} cat={cat} color={COLORS[i % COLORS.length]} currency={currency} />
             ))}
           </div>
 
@@ -238,12 +229,60 @@ export default function ReportDashboard({ report }: Props) {
   );
 }
 
+// ─── Category Row ────────────────────────────────────────────────────────────
+
+function CategoryRow({ cat, color, currency }: { cat: SpendCategory; color: string; currency: Currency }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasTransactions = !!cat.transactions?.length;
+
+  return (
+    <div className="border-b border-slate-50 last:border-0">
+      <button
+        onClick={() => hasTransactions && setExpanded(!expanded)}
+        className={cn('w-full flex justify-between items-center py-2.5 text-sm font-bold', hasTransactions && 'cursor-pointer hover:bg-slate-50 rounded-xl px-2 -mx-2 transition-colors')}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+          <span className="text-slate-700 truncate max-w-[130px]">{cat.name}</span>
+          {hasTransactions && <ChevronDown size={12} className={cn('text-slate-300 transition-transform duration-150', expanded && 'rotate-180')} />}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-slate-900">{fmt(cat.total, currency)}</span>
+          <span className="text-xs text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full w-14 text-center">{cat.percentage}%</span>
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {expanded && hasTransactions && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.15 }} className="overflow-hidden">
+            <div className="mb-2 mx-1 rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+              <table className="w-full text-xs">
+                <tbody>
+                  {cat.transactions!.map((tx, i) => (
+                    <tr key={i} className="border-t border-slate-100 first:border-0">
+                      <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{tx.date}</td>
+                      <td className="px-3 py-2 text-slate-600 font-medium truncate max-w-[120px]">{tx.description}</td>
+                      <td className="px-3 py-2 text-right font-mono font-bold text-slate-800">{fmt(tx.amount, currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ─── Insight Card ─────────────────────────────────────────────────────────────
 
 function InsightCard({ insight, currency }: { insight: Insight; currency: Currency }) {
   const [expanded, setExpanded] = useState(false);
   const Icon = insight.type === 'saving' ? CheckCircle2 : insight.type === 'alert' ? AlertTriangle : Lightbulb;
   const hasTransactions = !!insight.transactions?.length;
+  const hasSteps = !!insight.savingSteps?.length;
+  const isExpandable = hasTransactions || hasSteps;
 
   const colors = {
     saving: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700', table: 'bg-emerald-100 text-emerald-700', hint: 'text-emerald-600' },
@@ -254,8 +293,8 @@ function InsightCard({ insight, currency }: { insight: Insight; currency: Curren
   return (
     <div className={cn('rounded-2xl border shadow-sm overflow-hidden', colors.bg, colors.border)}>
       <button
-        onClick={() => hasTransactions && setExpanded(!expanded)}
-        className={cn('w-full text-left p-5 sm:p-6 flex gap-4 sm:gap-6 items-start', hasTransactions && 'cursor-pointer hover:brightness-95 transition-all')}
+        onClick={() => isExpandable && setExpanded(!expanded)}
+        className={cn('w-full text-left p-5 sm:p-6 flex gap-4 sm:gap-6 items-start', isExpandable && 'cursor-pointer hover:brightness-95 transition-all')}
       >
         <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white', colors.icon)}>
           <Icon size={24} />
@@ -267,43 +306,76 @@ function InsightCard({ insight, currency }: { insight: Insight; currency: Curren
               <span className={cn('px-3 py-1 rounded-full text-xs font-bold', colors.badge)}>
                 Save {fmt(insight.impactAmount, currency)}
               </span>
-              {hasTransactions && (
+              {isExpandable && (
                 <ChevronDown size={16} className={cn('text-slate-400 transition-transform duration-200', expanded && 'rotate-180')} />
               )}
             </div>
           </div>
           <p className="text-slate-600 leading-relaxed text-sm">{insight.description}</p>
-          {hasTransactions && (
-            <p className={cn('text-xs mt-2 font-medium flex items-center gap-1', colors.hint)}>
-              <Receipt size={12} />
-              {insight.transactions!.length} transaction{insight.transactions!.length !== 1 ? 's' : ''} · click to view
-            </p>
-          )}
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
+            {hasTransactions && (
+              <p className={cn('text-xs font-medium flex items-center gap-1', colors.hint)}>
+                <Receipt size={12} />
+                {insight.transactions!.length} transaction{insight.transactions!.length !== 1 ? 's' : ''}
+              </p>
+            )}
+            {insight.savingSteps?.length ? (
+              <p className={cn('text-xs font-medium flex items-center gap-1', colors.hint)}>
+                <ListChecks size={12} />
+                {insight.savingSteps.length} action steps
+              </p>
+            ) : null}
+            {(hasTransactions || insight.savingSteps?.length) && (
+              <p className={cn('text-xs font-medium', colors.hint)}>· click to expand</p>
+            )}
+          </div>
         </div>
       </button>
 
       <AnimatePresence>
-        {expanded && hasTransactions && (
+        {expanded && isExpandable && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-            <div className={cn('mx-5 mb-5 rounded-xl overflow-hidden border', colors.border, 'bg-white')}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className={cn('text-xs font-bold uppercase tracking-wider', colors.table)}>
-                    <th className="text-left px-4 py-2">Date</th>
-                    <th className="text-left px-4 py-2">Description</th>
-                    <th className="text-right px-4 py-2">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {insight.transactions!.map((tx, i) => (
-                    <tr key={i} className="border-t border-slate-100">
-                      <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">{tx.date}</td>
-                      <td className="px-4 py-2.5 text-slate-700 font-medium">{tx.description}</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900">{fmt(tx.amount, currency)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mx-5 mb-5 space-y-3">
+              {/* Action steps */}
+              {insight.savingSteps?.length ? (
+                <div className={cn('rounded-xl overflow-hidden border', colors.border)}>
+                  <div className={cn('px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2', colors.table)}>
+                    <ListChecks size={12} /> Action Steps
+                  </div>
+                  <ul className="bg-white divide-y divide-slate-50">
+                    {insight.savingSteps.map((step, i) => (
+                      <li key={i} className="px-4 py-2.5 text-sm text-slate-700 flex items-start gap-2">
+                        <span className={cn('font-bold shrink-0 mt-0.5', colors.hint)}>{i + 1}.</span>
+                        {step}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/* Transactions */}
+              {hasTransactions && (
+                <div className={cn('rounded-xl overflow-hidden border', colors.border, 'bg-white')}>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className={cn('text-xs font-bold uppercase tracking-wider', colors.table)}>
+                        <th className="text-left px-4 py-2">Date</th>
+                        <th className="text-left px-4 py-2">Description</th>
+                        <th className="text-right px-4 py-2">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {insight.transactions!.map((tx, i) => (
+                        <tr key={i} className="border-t border-slate-100">
+                          <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">{tx.date}</td>
+                          <td className="px-4 py-2.5 text-slate-700 font-medium">{tx.description}</td>
+                          <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900">{fmt(tx.amount, currency)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

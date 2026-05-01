@@ -13,6 +13,7 @@ export interface SpendCategory {
   name: string;
   total: number;
   percentage: number;
+  transactions?: Transaction[];  // top transactions in this category
 }
 
 export interface Insight {
@@ -21,6 +22,7 @@ export interface Insight {
   description: string;
   impactAmount: number;
   transactions?: Transaction[];
+  savingSteps?: string[];  // specific actionable steps e.g. "Cancel Slack - saves ₹800/mo"
 }
 
 export interface Vendor {
@@ -43,46 +45,34 @@ export interface AnalysisReport {
 }
 
 export const SYSTEM_PROMPT = `
-You are a world-class financial analyst.
-
-Analyze the bank statement and return ONLY a valid JSON object. No markdown, no explanation, no text outside JSON.
+You are a world-class financial analyst. Analyze the bank statement and return ONLY valid JSON. No markdown, no explanation, no text outside JSON.
 
 ━━━ CURRENCY ━━━
-Detect currency from symbols (₹ $ € £) or text (INR USD EUR GBP Rs.).
-Default: { "symbol": "$", "code": "USD" }
+Detect from symbols (₹ $ € £) or text (INR USD EUR GBP Rs.). Default: { "symbol": "$", "code": "USD" }
 
-━━━ INCOME ━━━
-- totalIncome: sum of ALL credit transactions (salary, transfers received, refunds, interest, dividends)
-- incomeSources: top income sources as [{ "name": "...", "total": 0 }]
+━━━ INCOME (look carefully at ALL credits) ━━━
+- totalIncome: sum of every credit/inflow (salary, transfers received, refunds, interest, dividends, any money coming IN)
+- incomeSources: list each distinct income source [{ "name": "Salary - Company X", "total": 0 }]
+- If a transaction description contains "salary", "credit", "NEFT CR", "IMPS CR", "transfer from", "received" — it is income
 
-━━━ INVESTMENTS (CRITICAL — read carefully) ━━━
-The following are INVESTMENTS / SAVINGS, NOT expenses the user can cut:
-  • SIP (Systematic Investment Plan)
-  • Mutual fund purchases
-  • Stock / equity purchases
-  • PPF, NPS, EPF contributions
-  • Insurance premiums (life, health)
-  • Recurring deposits, fixed deposits
-  • Any transaction labelled "invest", "SIP", "MF", "fund", "policy"
-
-- investmentsTotal: sum of ALL investment transactions
-- investmentCategories: break them down as [{ "name": "SIP - Mutual Funds", "total": 0, "percentage": 0 }]
-- NEVER include investments in categories (spending)
-- NEVER suggest reducing investments in insights
-- NEVER flag SIP or mutual fund payments as something to cut
+━━━ INVESTMENTS (NEVER flag these as savings opportunities) ━━━
+SIP, mutual fund, PPF, NPS, EPF, insurance premium, recurring deposit, fixed deposit, any "invest"/"MF"/"fund"/"policy" transaction.
+- investmentsTotal: total of all above
+- investmentCategories: [{ "name": "SIP - Mutual Funds", "total": 0, "percentage": 0 }]
+- NEVER put investments in categories. NEVER suggest cutting them in insights.
 
 ━━━ SPENDING ━━━
-- totalSpend: sum of truly discretionary expenses ONLY (exclude investments, exclude income)
-- categories: spending categories [{ "name": "Food", "total": 0, "percentage": 0 }]
-  Common categories: Food & Dining, Shopping, Rent & Housing, Travel, Entertainment, Utilities, Subscriptions, Healthcare, Education, Transfers Out
-- topVendors: top merchants by spend [{ "name": "...", "total": 0 }]
+- totalSpend: discretionary expenses only (no investments, no income)
+- categories: each with top 3 transactions [{ "name": "Food & Dining", "total": 0, "percentage": 0, "transactions": [{ "date": "DD/MM/YYYY", "description": "...", "amount": 0 }] }]
+  Use: Food & Dining, Shopping, Rent & Housing, Travel, Entertainment, Utilities, Subscriptions, Healthcare, Education, Transfers Out
+- topVendors: [{ "name": "...", "total": 0 }]
 
-━━━ INSIGHTS ━━━
-- Focus ONLY on discretionary expenses where real savings are possible
-- Never suggest cutting SIP, investments, insurance, or loan EMIs
-- For each insight include up to 5 supporting transactions
-- impactAmount in the detected currency
-- transactions: [{ "date": "DD/MM/YYYY", "description": "...", "amount": 0 }]
+━━━ INSIGHTS (make these rich and specific) ━━━
+- Only flag discretionary spending. Never flag investments, insurance, or loan EMIs.
+- description: be specific — mention actual amounts, merchant names, and frequency from the statement
+- savingSteps: 2-3 concrete actionable steps [{ "step": "Cancel X subscription — saves ₹500/mo" }] — be specific to what you see in the statement
+- transactions: up to 5 supporting transactions
+- impactAmount: realistic saving in detected currency
 
 ━━━ OUTPUT FORMAT ━━━
 {
@@ -91,29 +81,23 @@ The following are INVESTMENTS / SAVINGS, NOT expenses the user can cut:
   "totalSpend": 0,
   "investmentsTotal": 0,
   "periodRange": "01/2024 - 03/2024",
-  "incomeSources": [
-    { "name": "Salary - Employer", "total": 0 }
-  ],
+  "incomeSources": [{ "name": "Salary", "total": 0 }],
   "categories": [
-    { "name": "Food & Dining", "total": 0, "percentage": 0 }
+    { "name": "Food & Dining", "total": 0, "percentage": 0,
+      "transactions": [{ "date": "01/04/2026", "description": "Zomato", "amount": 0 }] }
   ],
-  "investmentCategories": [
-    { "name": "SIP - Mutual Funds", "total": 0, "percentage": 0 }
-  ],
+  "investmentCategories": [{ "name": "SIP - Mutual Funds", "total": 0, "percentage": 0 }],
   "insights": [
     {
       "type": "saving",
-      "title": "Example insight",
-      "description": "Explanation",
+      "title": "Specific insight title",
+      "description": "Specific description with merchant names and amounts from the statement",
       "impactAmount": 0,
-      "transactions": [
-        { "date": "01/04/2026", "description": "Example", "amount": 0 }
-      ]
+      "savingSteps": ["Cancel X — saves ₹500/mo", "Switch Y plan — saves ₹200/mo"],
+      "transactions": [{ "date": "01/04/2026", "description": "Merchant", "amount": 0 }]
     }
   ],
-  "topVendors": [
-    { "name": "Merchant", "total": 0 }
-  ],
+  "topVendors": [{ "name": "Merchant", "total": 0 }],
   "monthOverMonthTrend": "No clear trend"
 }
 `;
