@@ -1,8 +1,12 @@
+export interface Currency {
+  symbol: string;  // e.g. '₹', '$', '€', '£'
+  code: string;    // e.g. 'INR', 'USD', 'EUR', 'GBP'
+}
+
 export interface Transaction {
   date: string;
   description: string;
   amount: number;
-  category: string;
 }
 
 export interface SpendCategory {
@@ -15,7 +19,8 @@ export interface Insight {
   type: 'saving' | 'alert' | 'recommendation';
   title: string;
   description: string;
-  impactUSD: number;
+  impactAmount: number;
+  transactions?: Transaction[];
 }
 
 export interface Vendor {
@@ -24,12 +29,13 @@ export interface Vendor {
 }
 
 export interface AnalysisReport {
+  currency: Currency;
   totalSpend: number;
   periodRange: string;
   categories: SpendCategory[];
   insights: Insight[];
   topVendors: Vendor[];
-  monthOverMonthTrend: string; // 🔒 now mandatory (avoid undefined issues)
+  monthOverMonthTrend: string;
 }
 
 export const SYSTEM_PROMPT = `
@@ -44,23 +50,37 @@ STRICT RULES (VERY IMPORTANT):
 - Ensure ALL fields are present.
 - If data is missing, still return the field with a reasonable default.
 
+CURRENCY DETECTION:
+- Detect the currency from the statement (look for symbols ₹, $, €, £, or text like INR, USD, EUR, GBP, Rs., etc.)
+- Return as: { "symbol": "₹", "code": "INR" }
+- Default to { "symbol": "$", "code": "USD" } if unclear
+
 FIELD RULES:
+- currency: object with symbol and code
 - totalSpend: number (sum of all debits)
 - periodRange: string ("MM/YYYY - MM/YYYY")
 - categories: array of { name, total, percentage }
-- insights: array of { type, title, description, impactUSD }
+- insights: array of { type, title, description, impactAmount, transactions }
 - topVendors: array of { name, total }
 - monthOverMonthTrend: string (ALWAYS include, even if "Insufficient data")
+
+INSIGHT RULES:
+- For each insight, include up to 5 relevant transactions that support it
+- transactions: array of { "date": "DD/MM/YYYY", "description": "...", "amount": 1234.56 }
+- impactAmount is in the detected currency (not always USD)
+- Keep insight descriptions concise and actionable
+- Use the correct currency symbol in descriptions (not always $)
 
 LOGIC RULES:
 1. Categorize spend into logical groups (Food, Rent, Shopping, Travel, etc.)
 2. Identify unusual spending spikes
 3. Detect subscriptions or repeated payments
-4. Suggest savings opportunities with realistic USD impact
+4. Suggest savings opportunities with realistic impact in the detected currency
 5. Keep insights concise and actionable
 
 OUTPUT FORMAT (STRICT):
 {
+  "currency": { "symbol": "₹", "code": "INR" },
   "totalSpend": 0,
   "periodRange": "01/2024 - 03/2024",
   "categories": [
@@ -71,7 +91,10 @@ OUTPUT FORMAT (STRICT):
       "type": "saving",
       "title": "Example insight",
       "description": "Explanation",
-      "impactUSD": 0
+      "impactAmount": 0,
+      "transactions": [
+        { "date": "01/04/2026", "description": "Example transaction", "amount": 500 }
+      ]
     }
   ],
   "topVendors": [
