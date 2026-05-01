@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Hero from './Hero';
 import AnalyzerWidget from './AnalyzerWidget';
@@ -13,12 +13,15 @@ export default function Home() {
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  useEffect(() => {
+    if (report) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [report]);
+
   const handleReportGenerated = (newReport: AnalysisReport) => {
     setReport(newReport);
     setIsAnalyzing(false);
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 100);
   };
 
   const loadSampleReport = () => {

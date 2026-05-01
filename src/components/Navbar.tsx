@@ -6,7 +6,7 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-emerald-900/5">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/" reloadDocument className="flex items-center gap-2">
           <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
             <ScanLine className="text-accent" size={18} />
           </div>
