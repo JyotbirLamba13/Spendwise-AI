@@ -2,28 +2,40 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
 import multer from 'multer';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+// Disable external worker — text extraction runs in the main thread in Node.js
+(pdfjsLib as any).GlobalWorkerOptions.workerSrc = '';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function extractTextFromPDF(buffer: Buffer, password?: string): Promise<string> {
+  const data = new Uint8Array(buffer);
+
+  const loadingTask = (pdfjsLib as any).getDocument({
+    data,
+    password: password || undefined,
+    useSystemFonts: true,
+    disableFontFace: true,
+  });
+
   try {
-    const options: Record<string, unknown> = {};
-    if (password) options.password = password;
-    const data = await pdfParse(buffer, options);
-    return data.text as string;
+    const pdf = await loadingTask.promise;
+    let text = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items
+        .map((item: any) => ('str' in item ? item.str : ''))
+        .join(' ') + '\n';
+    }
+
+    return text;
   } catch (err: any) {
-    if (
-      err.name === 'PasswordException' ||
-      (typeof err.message === 'string' &&
-        (err.message.toLowerCase().includes('password') ||
-          err.message.toLowerCase().includes('encrypted')))
-    ) {
+    if (err.name === 'PasswordException') {
       throw new Error('PASSWORD_REQUIRED');
     }
     throw err;
@@ -82,21 +94,21 @@ async function startServer() {
               return res.status(400).json({
                 error: 'SCAN_DETECTED',
                 message:
-                  'This PDF appears to be scanned or unreadable. Please upload a text-based PDF.',
+                  'This PDF appears to be scanned or image-based. Please upload a text-based PDF.',
               });
             }
           } catch (error: any) {
             if (error.message === 'PASSWORD_REQUIRED') {
               return res.status(401).json({
                 error: 'PASSWORD_REQUIRED',
-                message: 'This PDF is password protected. Please enter password.',
+                message: 'This PDF is password protected. Please enter the password.',
               });
             }
 
-            console.error('PDF parsing error:', error);
+            console.error('PDF parsing error:', error.message, error.stack);
             return res.status(500).json({
               error: 'PDF parsing failed',
-              details: error.message,
+              message: `Could not read this PDF: ${error.message}`,
             });
           }
         } else if (originalname.toLowerCase().endsWith('.csv')) {
@@ -104,7 +116,7 @@ async function startServer() {
         }
 
         res.json({ text, fileName: originalname });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Server error:', error);
         res.status(500).json({ error: 'Failed to process document' });
       }
