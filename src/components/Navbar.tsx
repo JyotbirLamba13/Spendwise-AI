@@ -20,14 +20,9 @@ export default function Navbar() {
           <Link to="/blog" className="hover:text-brand transition-colors">Blog</Link>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Link to="/pricing" className="hidden sm:block text-sm font-medium text-slate-700 hover:text-brand px-4 py-2 transition-colors">
-            Login
-          </Link>
-          <a href="mailto:vb528@georgetown.edu" className="bg-accent text-brand text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-[#c3e83b] transition-all shadow-lg shadow-emerald-900/10">
-            Book a Demo
-          </a>
-        </div>
+        <a href="mailto:vb528@georgetown.edu" className="bg-accent text-brand text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-[#c3e83b] transition-all shadow-lg shadow-emerald-900/10">
+          Book a Demo
+        </a>
       </div>
     </nav>
   );
