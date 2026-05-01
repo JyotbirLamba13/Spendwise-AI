@@ -205,7 +205,7 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
               onKeyDown={(e) => e.key === 'Enter' && password && handleUpload()}
               placeholder="Enter PDF password"
               autoFocus
-              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+              className="w-full p-3 border-2 border-slate-200 rounded-2xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand transition-colors bg-white"
             />
           </motion.div>
         )}

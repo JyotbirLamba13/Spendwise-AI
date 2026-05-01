@@ -30,7 +30,7 @@ export async function analyzeStatement(text: string): Promise<AnalysisReport> {
   // 🔴 CRITICAL: prevent huge payloads
   const cleanedText = truncateText(text);
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const body = {
     systemInstruction: {
@@ -68,10 +68,15 @@ export async function analyzeStatement(text: string): Promise<AnalysisReport> {
     try {
       err = await response.json();
     } catch {
-      throw new Error("AI request failed");
+      throw new Error("Could not connect to the AI service. Please try again.");
     }
 
-    throw new Error(err.error?.message || "Gemini API error");
+    const msg = err.error?.message || '';
+    if (response.status === 400) throw new Error("The statement text could not be processed. Try a different file.");
+    if (response.status === 401 || response.status === 403) throw new Error("Invalid API key. Please check your Gemini API key in settings.");
+    if (response.status === 429) throw new Error("Too many requests. Please wait a moment and try again.");
+    if (msg.includes('not found') || msg.includes('deprecated')) throw new Error("AI model unavailable. Please contact support.");
+    throw new Error("AI analysis failed. Please try again in a moment.");
   }
 
   const data = await response.json();
