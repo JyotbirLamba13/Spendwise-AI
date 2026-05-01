@@ -13,7 +13,11 @@ export default function Press() {
           
           <h2 className="text-2xl font-bold mb-4 mt-8">Brand Guidelines</h2>
           <p className="text-slate-500 mb-4">Please download our press kit to access high-resolution logos, brand colors, and product screenshots.</p>
-          <button className="bg-slate-100 text-slate-700 font-bold py-2 px-6 rounded-full hover:bg-slate-200 transition-colors">Download Press Kit (ZIP)</button>
+          <a
+            href="mailto:vb528@georgetown.edu?subject=Press%20Kit%20Request"
+            className="inline-block bg-slate-100 text-slate-700 font-bold py-2 px-6 rounded-full hover:bg-slate-200 transition-colors">
+            Request Press Kit
+          </a>
        </div>
     </div>
   );

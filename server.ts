@@ -2,33 +2,28 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import multer from 'multer';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
+
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function extractTextFromPDF(buffer: Buffer, password?: string) {
-  const loadingTask = pdfjsLib.getDocument({
-    data: buffer,
-    password: password || undefined,
-  });
-
+async function extractTextFromPDF(buffer: Buffer, password?: string): Promise<string> {
   try {
-    const pdf = await loadingTask.promise;
-    let text = '';
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-
-      const pageText = content.items.map((item: any) => item.str).join(' ');
-      text += pageText + '\n';
-    }
-
-    return text;
+    const options: Record<string, unknown> = {};
+    if (password) options.password = password;
+    const data = await pdfParse(buffer, options);
+    return data.text as string;
   } catch (err: any) {
-    if (err.name === 'PasswordException') {
+    if (
+      err.name === 'PasswordException' ||
+      (typeof err.message === 'string' &&
+        (err.message.toLowerCase().includes('password') ||
+          err.message.toLowerCase().includes('encrypted')))
+    ) {
       throw new Error('PASSWORD_REQUIRED');
     }
     throw err;
@@ -37,20 +32,15 @@ async function extractTextFromPDF(buffer: Buffer, password?: string) {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
-  // Multer setup (memory storage)
   const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    limits: { fileSize: 10 * 1024 * 1024 },
   });
 
-  // IMPORTANT: needed for reading text fields like password
   app.use(express.urlencoded({ extended: true }));
 
-  // ============================
-  // API ROUTE
-  // ============================
   app.post(
     '/api/parse-document',
     upload.fields([
@@ -67,7 +57,6 @@ async function startServer() {
 
         const { buffer, originalname, mimetype, size } = file;
 
-        // ✅ File validation
         if (size > 10 * 1024 * 1024) {
           return res.status(400).json({ error: 'File too large (max 10MB)' });
         }
@@ -83,16 +72,12 @@ async function startServer() {
 
         let text = '';
 
-        // ============================
-        // PDF HANDLING
-        // ============================
         if (originalname.toLowerCase().endsWith('.pdf')) {
           const password = req.body?.password || undefined;
 
           try {
             text = await extractTextFromPDF(buffer, password);
 
-            // Detect scanned PDFs
             if (!text || text.trim().length < 30) {
               return res.status(400).json({
                 error: 'SCAN_DETECTED',
@@ -114,22 +99,11 @@ async function startServer() {
               details: error.message,
             });
           }
-        }
-
-        // ============================
-        // CSV HANDLING
-        // ============================
-        else if (originalname.toLowerCase().endsWith('.csv')) {
+        } else if (originalname.toLowerCase().endsWith('.csv')) {
           text = buffer.toString('utf-8');
         }
 
-        // ============================
-        // RESPONSE
-        // ============================
-        res.json({
-          text,
-          fileName: originalname,
-        });
+        res.json({ text, fileName: originalname });
       } catch (error) {
         console.error('Server error:', error);
         res.status(500).json({ error: 'Failed to process document' });
@@ -137,9 +111,6 @@ async function startServer() {
     }
   );
 
-  // ============================
-  // VITE SETUP
-  // ============================
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

@@ -21,9 +21,9 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="hidden sm:block text-sm font-medium text-slate-700 hover:text-brand px-4 py-2 transition-colors">
+          <Link to="/pricing" className="hidden sm:block text-sm font-medium text-slate-700 hover:text-brand px-4 py-2 transition-colors">
             Login
-          </button>
+          </Link>
           <a href="mailto:vb528@georgetown.edu" className="bg-accent text-brand text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-[#c3e83b] transition-all shadow-lg shadow-emerald-900/10">
             Book a Demo
           </a>

@@ -9,7 +9,9 @@ export default function Careers() {
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 mb-2">Careers <span className="text-slate-300">/</span> About Me</h1>
             <p className="text-slate-500 text-lg">Actually, ClearSpend is currently a one-man army. Let's build together.</p>
          </div>
-         <button className="bg-brand text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg shadow-emerald-900/10 hover:bg-emerald-900 transition-colors">
+         <button
+            onClick={() => window.print()}
+            className="bg-brand text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg shadow-emerald-900/10 hover:bg-emerald-900 transition-colors">
             <Download size={18} />
             Download PDF
          </button>
