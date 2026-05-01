@@ -77,11 +77,32 @@ async function analyzeWithGemini(text: string): Promise<AnalysisReport> {
   if (!response.ok) {
     const err = await response.json().catch(() => ({})) as any;
     const msg = err?.error?.message || '';
-    console.error('Gemini API error:', response.status, msg);
-    if (response.status === 429) throw new Error('The AI service is temporarily busy. Please wait 30 seconds and try again.');
-    if (response.status === 401 || response.status === 403) throw new Error('Invalid Gemini API key. Please check the GEMINI_API_KEY environment variable in Render.');
-    if (msg.includes('not found') || msg.includes('deprecated')) throw new Error('AI model unavailable. Contact support.');
-    throw new Error(`AI request failed (${response.status}). Please try again.`);
+    const status = err?.error?.status || '';
+    console.error('Gemini API error — HTTP:', response.status, '| status:', status, '| message:', msg);
+
+    if (response.status === 429 || status === 'RESOURCE_EXHAUSTED') {
+      // Auto-retry once after 5 seconds
+      console.log('Rate limited — retrying in 5s...');
+      await new Promise(r => setTimeout(r, 5000));
+      const retry = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{ parts: [{ text: `Analyze this bank statement and return STRICT JSON only:\n\n${cleanedText}` }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
+        }),
+      });
+      if (retry.ok) {
+        const retryData = await retry.json() as any;
+        const retryContent = retryData?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (retryContent) return safeJsonParse(retryContent) as AnalysisReport;
+      }
+      throw new Error('The AI service is rate-limited. Please wait 1 minute and try again.');
+    }
+    if (response.status === 401 || response.status === 403) throw new Error('Invalid Gemini API key. Go to Render → Environment and verify GEMINI_API_KEY is set correctly.');
+    if (msg.includes('not found') || msg.includes('deprecated')) throw new Error(`AI model unavailable: ${msg}`);
+    throw new Error(`AI request failed (${response.status}): ${msg || 'Please try again.'}`);
   }
 
   const data = await response.json() as any;
