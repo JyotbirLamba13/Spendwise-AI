@@ -57,7 +57,7 @@ async function analyzeWithGemini(text: string): Promise<AnalysisReport> {
   if (!apiKey) throw new Error('Gemini API key is not configured on the server.');
 
   const cleanedText = text.slice(0, 12000);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
 
   let response: Response;
   try {
