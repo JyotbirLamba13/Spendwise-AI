@@ -2,11 +2,14 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import multer from 'multer';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-// Disable external worker — text extraction runs in the main thread in Node.js
-(pdfjsLib as any).GlobalWorkerOptions.workerSrc = '';
+// Point pdfjs to its worker file — required even in Node.js for v5
+const _require = createRequire(import.meta.url);
+const workerPath = _require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+(pdfjsLib as any).GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
