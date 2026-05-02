@@ -16,6 +16,13 @@ export class PasswordRequiredError extends Error {
   }
 }
 
+export class WrongPasswordError extends Error {
+  constructor() {
+    super('WRONG_PASSWORD');
+    this.name = 'WrongPasswordError';
+  }
+}
+
 export class ScannedPDFError extends Error {
   constructor() {
     super('SCAN_DETECTED');
@@ -57,7 +64,11 @@ async function extractFromPDF(file: File, password?: string): Promise<string> {
   try {
     pdf = await loadingTask.promise;
   } catch (err: any) {
-    if (err.name === 'PasswordException') throw new PasswordRequiredError();
+    if (err.name === 'PasswordException') {
+      // code 1 = no password supplied, code 2 = wrong password
+      if (err.code === 2) throw new WrongPasswordError();
+      throw new PasswordRequiredError();
+    }
     throw new Error(`Could not read this PDF: ${err.message}`);
   }
 

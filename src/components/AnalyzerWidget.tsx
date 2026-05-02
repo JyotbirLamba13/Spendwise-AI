@@ -4,7 +4,7 @@ import { Upload, FileText, Lock, Loader2, PlayCircle, AlertCircle, X, Eye, EyeOf
 import { AnalysisReport } from '../types';
 import { cn } from '../lib/utils';
 import { SAMPLE_REPORT } from '../lib/sampleData';
-import { extractTextFromFile, PasswordRequiredError, ScannedPDFError } from '../lib/documentParser';
+import { extractTextFromFile, PasswordRequiredError, WrongPasswordError, ScannedPDFError } from '../lib/documentParser';
 
 interface AnalyzerWidgetProps {
   onReportGenerated: (report: AnalysisReport) => void;
@@ -64,6 +64,12 @@ export default function AnalyzerWidget({ onReportGenerated, onNonFinancialDocume
       } catch (extractErr: any) {
         if (extractErr instanceof PasswordRequiredError) {
           setNeedsPassword(true);
+          setIsLoading(false);
+          return;
+        }
+        if (extractErr instanceof WrongPasswordError) {
+          setNeedsPassword(true);
+          setError('Incorrect password. Please try again.');
           setIsLoading(false);
           return;
         }
@@ -182,7 +188,7 @@ export default function AnalyzerWidget({ onReportGenerated, onNonFinancialDocume
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setError(null); }}
                 onKeyDown={(e) => e.key === 'Enter' && password && handleUpload()}
                 placeholder="Enter PDF password"
                 autoFocus
