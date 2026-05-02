@@ -27,7 +27,7 @@ export default function ReportDashboard({ report }: Props) {
   const insights = report.insights ?? [];
   const incomeSources = report.incomeSources ?? [];
   const investmentCategories = report.investmentCategories ?? [];
-  const categories = report.categories ?? [];
+  const rawCategories = report.categories ?? [];
   const topVendors = report.topVendors ?? [];
   const duplicates = report.duplicateTransactions ?? [];
   const reversals = report.reversalTransactions ?? [];
@@ -39,6 +39,20 @@ export default function ReportDashboard({ report }: Props) {
   const spend = report.totalSpend ?? 0;
   const investments = report.investmentsTotal ?? 0;
   const netFlow = income - spend - investments;
+
+  // Recompute category totals and percentages from the actual transactions the AI
+  // returned — the AI-provided `total` field can be wrong (e.g. it counts reversed
+  // transactions, mis-sums rows, or shows top-N transactions but a larger total).
+  const categories = rawCategories.map(cat => {
+    const txs = cat.transactions ?? [];
+    const computedTotal = txs.length > 0
+      ? txs.reduce((sum, tx) => sum + (tx.amount ?? 0), 0)
+      : cat.total;
+    const computedPct = spend > 0
+      ? Math.round((computedTotal / spend) * 100)
+      : cat.percentage;
+    return { ...cat, total: computedTotal, percentage: computedPct };
+  });
 
   const scrollToInsights = () => insightsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const hasAlerts = duplicates.length > 0 || reversals.length > 0;

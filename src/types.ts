@@ -84,7 +84,9 @@ investmentsTotal = sum of all above. investmentCategories = breakdown by type.
 ━━━ STEP 5 — SPENDING CATEGORIES (follow categorization rules EXACTLY) ━━━
 totalSpend = all discretionary debits, excluding investments.
 Standard buckets: Food & Dining, Shopping, Rent & Housing, Travel, Entertainment, Utilities, Subscriptions, Healthcare, Education, Transfers Out, Fuel & Transport, Personal Care, Other.
-Include the top 5 transactions per category. percentage = share of totalSpend (must sum to 100).
+Include EVERY transaction for each category — no cap, no truncation. The frontend sums transactions[] to compute the displayed total, so if any transaction is missing the math will be wrong.
+The 'total' field for each category MUST equal the exact sum of its transactions[].amount values.
+percentage = share of totalSpend (must sum to 100).
 topVendors: top 10 merchants by total spend.
 
 STRICT CATEGORIZATION RULES — these override any other logic:
