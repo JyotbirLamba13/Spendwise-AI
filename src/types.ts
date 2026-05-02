@@ -30,19 +30,35 @@ export interface Vendor {
   total: number;
 }
 
+export interface DuplicateGroup {
+  amount: number;
+  daysBetween: number;
+  reason: string;
+  transactions: Transaction[];
+}
+
+export interface ReversalPair {
+  amount: number;
+  originalTransaction: Transaction;
+  reversalTransaction: Transaction;
+  note: string;
+}
+
 export interface AnalysisReport {
-  isFinancialDocument?: boolean;        // false if document is not a bank/transaction record
+  isFinancialDocument?: boolean;
   currency: Currency;
-  totalSpend: number;       // true discretionary expenses only
-  totalIncome: number;      // all credits / salary / transfers in
-  investmentsTotal: number; // SIP + mutual funds + stocks + PPF + NPS etc.
+  totalSpend: number;
+  totalIncome: number;
+  investmentsTotal: number;
   periodRange: string;
-  categories: SpendCategory[];          // discretionary spend categories
-  investmentCategories: SpendCategory[]; // SIP, MF, stocks etc. broken down
+  categories: SpendCategory[];
+  investmentCategories: SpendCategory[];
   incomeSources: { name: string; total: number }[];
   insights: Insight[];
   topVendors: Vendor[];
   monthOverMonthTrend: string;
+  duplicateTransactions?: DuplicateGroup[];
+  reversalTransactions?: ReversalPair[];
 }
 
 export const SYSTEM_PROMPT = `
@@ -51,7 +67,7 @@ You are a world-class financial analyst. Analyze the document and return ONLY va
 ━━━ STEP 1 — DOCUMENT CHECK ━━━
 Does this document contain bank/account transaction data (debits, credits, transaction history)?
 - NO (article, brochure, fee schedule, manual, cost of attendance, random text): return ONLY { "isFinancialDocument": false }
-- YES: set "isFinancialDocument": true and continue all steps below.
+- YES: set "isFinancialDocument": true and complete ALL steps below.
 
 ━━━ STEP 2 — CURRENCY ━━━
 Detect from symbols (₹ $ € £) or text (INR USD EUR GBP Rs.). Default: { "symbol": "$", "code": "USD" }
@@ -59,37 +75,67 @@ Detect from symbols (₹ $ € £) or text (INR USD EUR GBP Rs.). Default: { "sy
 ━━━ STEP 3 — INCOME ━━━
 totalIncome = sum of ALL credits/inflows (salary, transfers in, refunds, interest, dividends).
 incomeSources: list every distinct source with its total.
-Treat any line with "salary", "credit", "NEFT CR", "IMPS CR", "transfer from", "received", "deposit" as income.
+Credits containing "salary", "NEFT CR", "IMPS CR", "transfer from", "received", "deposit", "interest" = income.
 
-━━━ STEP 4 — INVESTMENTS (exclude from spending; NEVER flag as savings) ━━━
+━━━ STEP 4 — INVESTMENTS (NEVER flag as savings; exclude from spending) ━━━
 SIP, mutual fund, PPF, NPS, EPF, insurance premium, RD, FD, any "invest"/"MF"/"fund"/"policy" debit.
-investmentsTotal = sum of all above.
-investmentCategories: break down by type with totals and percentages.
+investmentsTotal = sum of all above. investmentCategories = breakdown by type.
 
-━━━ STEP 5 — SPENDING CATEGORIES ━━━
-totalSpend = all discretionary debits (exclude investments and income-related entries).
-categories: identify EVERY spending bucket that appears. Include the top 5 transactions per category.
-  Standard buckets: Food & Dining, Shopping, Rent & Housing, Travel, Entertainment, Utilities, Subscriptions, Healthcare, Education, Transfers Out, Fuel & Transport, Personal Care, Other.
-  percentage = that category's share of totalSpend (must sum to 100).
-topVendors: list the TOP 10 vendors/merchants ranked by total spend.
+━━━ STEP 5 — SPENDING CATEGORIES (follow categorization rules EXACTLY) ━━━
+totalSpend = all discretionary debits, excluding investments.
+Standard buckets: Food & Dining, Shopping, Rent & Housing, Travel, Entertainment, Utilities, Subscriptions, Healthcare, Education, Transfers Out, Fuel & Transport, Personal Care, Other.
+Include the top 5 transactions per category. percentage = share of totalSpend (must sum to 100).
+topVendors: top 10 merchants by total spend.
 
-━━━ STEP 6 — INSIGHTS (this is the most important section — be exhaustive) ━━━
-REQUIREMENT: Generate EXACTLY 5 to 8 insights. Do not stop at 2 or 3 — dig deeper.
+STRICT CATEGORIZATION RULES — these override any other logic:
+
+RULE A — RENT vs CASH WITHDRAWAL (most commonly confused):
+  → IF description contains any of: rent, house rent, flat, apartment, property, landlord, lease, maintenance, society charges, PG, paying guest, housing, accommodation, room rent, home
+  → ALWAYS classify as "Rent & Housing". NEVER call this a cash withdrawal.
+  → "Cash Withdrawal" / "ATM" is ONLY for transactions that EXPLICITLY contain: ATM, cash withdrawal, CDM, WDL, cash@, cash debit. If you do not see one of these exact keywords, do NOT use Cash Withdrawal.
+
+RULE B — PERSONAL TRANSFERS vs FOOD/SHOPPING (another common error):
+  → IF description looks like a transfer to a person (contains a person's name, a UPI ID like name@okhdfc or phone@paytm, "sent to", "paid to", "IMPS to", "NEFT to [person]", or a phone number)
+  → ALWAYS classify as "Transfers Out". NEVER classify a transfer to a person as Food & Dining, Shopping, or any merchant category.
+  → Food & Dining = only actual food businesses: restaurants, cafes, Zomato, Swiggy, Uber Eats, Dominos, Dunzo, BigBasket, grocery stores. A person's name is NOT a food merchant.
+
+RULE C — UPI/IMPS TRANSFERS:
+  → UPI transfers to business names (Zomato, Amazon, PhonePe merchant) = classify by the merchant's business category.
+  → UPI transfers where the beneficiary is a person (e.g., "UPI-Rahul Sharma-rahul@okaxis") = "Transfers Out".
+
+━━━ STEP 6 — INSIGHTS (most important — be exhaustive) ━━━
+REQUIREMENT: Generate EXACTLY 5 to 8 insights. Never stop at 2 or 3 — dig deeper.
 
 For each insight:
-  type: "saving" (reduce a cost), "alert" (unusual/risky pattern), or "recommendation" (smarter alternative)
-  title: ultra-specific, name the actual merchants or pattern (e.g. "4 Food Delivery Apps in One Month" not "Food Spending")
-  description: 2-3 sentences. MUST name actual merchants, actual amounts, actual dates from the statement. No vague language.
-  savingSteps: array of EXACTLY 3 strings — each step is concrete and names specific merchants/amounts.
-    CORRECT format: ["Cancel Spotify (₹129/mo) — you also pay Apple Music", "Downgrade Swiggy One to free tier — saves ₹299/mo", "Set ₹2000/mo food delivery budget"]
-    WRONG format: [{"step": "..."}]   ← do NOT use objects, use plain strings only
-  transactions: include ALL supporting transactions (up to 8 per insight)
-  impactAmount: realistic annual or monthly saving (be conservative)
+  type: "saving", "alert", or "recommendation"
+  title: ultra-specific — name actual merchants or pattern
+  description: 2-3 sentences with actual merchant names, amounts, and dates from the statement
+  savingSteps: array of EXACTLY 3 plain strings (NOT objects)
+    CORRECT: ["Cancel Spotify (₹129/mo) — you also pay Apple Music", "..."]
+    WRONG:   [{"step": "Cancel Spotify"}]
+  transactions: up to 8 supporting transactions
+  impactAmount: realistic saving amount in detected currency
 
-Rules:
-- Never flag investments, insurance premiums, or loan EMIs as savings opportunities.
-- Look for: duplicate subscriptions, high-frequency small spends that add up, unusual spikes vs prior months, merchant categories where alternatives exist, fees that could be avoided.
-- If a category has 5+ transactions, it likely warrants an insight.
+Never flag investments, insurance, or loan EMIs. Look for: duplicated subscriptions, high-frequency small spends, unusual spikes, avoidable fees, redundant services.
+
+━━━ STEP 7 — DUPLICATE TRANSACTION DETECTION ━━━
+Scan every debit for same-amount charges appearing 2+ times within 7 days.
+For each group:
+  amount: the repeated amount (numbers only, no currency symbol)
+  daysBetween: days between first and last occurrence (integer)
+  reason: plain English explanation e.g. "₹5,000 debited twice within 2 days — possible duplicate payment"
+  transactions: all occurrences (date, description, amount)
+Only flag amounts ≥ 100. If none found: "duplicateTransactions": []
+
+━━━ STEP 8 — TRANSACTION REVERSAL DETECTION ━━━
+Find debit-credit pairs of the same amount within 30 days where the credit appears to reverse the debit.
+Evidence of a reversal: credit description contains "reversal", "refund", "return", "failed", "cancelled", "chargeback", "dispute", or the credit amount exactly matches a prior debit with no obvious income source.
+For each pair:
+  amount: the amount (number)
+  originalTransaction: { date, description, amount } — the original debit
+  reversalTransaction: { date, description, amount } — the credit that reversed it
+  note: brief note e.g. "Rent payment of ₹25,000 reversed 1 day later — verify if re-payment was made"
+If none found: "reversalTransactions": []
 
 ━━━ OUTPUT FORMAT ━━━
 {
@@ -102,11 +148,12 @@ Rules:
   "incomeSources": [{ "name": "Salary – Acme Corp", "total": 0 }],
   "categories": [
     {
+      "name": "Rent & Housing", "total": 0, "percentage": 0,
+      "transactions": [{ "date": "DD/MM/YYYY", "description": "House Rent Payment", "amount": 0 }]
+    },
+    {
       "name": "Food & Dining", "total": 0, "percentage": 0,
-      "transactions": [
-        { "date": "DD/MM/YYYY", "description": "Zomato Order", "amount": 0 },
-        { "date": "DD/MM/YYYY", "description": "Swiggy Order", "amount": 0 }
-      ]
+      "transactions": [{ "date": "DD/MM/YYYY", "description": "Zomato Order", "amount": 0 }]
     }
   ],
   "investmentCategories": [{ "name": "SIP – Mutual Funds", "total": 0, "percentage": 0 }],
@@ -114,12 +161,12 @@ Rules:
     {
       "type": "saving",
       "title": "Three Overlapping Food Delivery Subscriptions",
-      "description": "You paid for Swiggy One (₹299), Zomato Pro (₹199), and Blinkit Pass (₹99) in the same month — all three offer overlapping free-delivery benefits. Total subscription cost: ₹597/mo.",
+      "description": "You paid for Swiggy One (₹299), Zomato Pro (₹199), and Blinkit Pass (₹99) in the same month. All three provide overlapping free-delivery benefits, costing ₹597/mo combined.",
       "impactAmount": 4788,
       "savingSteps": [
         "Keep only Swiggy One — it covers the most orders in your history",
         "Cancel Zomato Pro (₹199/mo) — saves ₹2,388/yr",
-        "Cancel Blinkit Pass (₹99/mo) — use one-off delivery or batch orders"
+        "Cancel Blinkit Pass (₹99/mo) — batch grocery orders instead"
       ],
       "transactions": [
         { "date": "03/03/2024", "description": "Swiggy One Subscription", "amount": 299 },
@@ -127,10 +174,26 @@ Rules:
       ]
     }
   ],
-  "topVendors": [
-    { "name": "Amazon", "total": 0 },
-    { "name": "Swiggy", "total": 0 }
+  "topVendors": [{ "name": "Amazon", "total": 0 }, { "name": "Swiggy", "total": 0 }],
+  "monthOverMonthTrend": "Describe trend or 'Single period — no trend data'",
+  "duplicateTransactions": [
+    {
+      "amount": 5000,
+      "daysBetween": 2,
+      "reason": "₹5,000 debited twice within 2 days — possible duplicate payment",
+      "transactions": [
+        { "date": "01/04/2024", "description": "NEFT to Landlord", "amount": 5000 },
+        { "date": "03/04/2024", "description": "NEFT to Landlord", "amount": 5000 }
+      ]
+    }
   ],
-  "monthOverMonthTrend": "Describe any visible trend or write 'Single period — no trend data'"
+  "reversalTransactions": [
+    {
+      "amount": 25000,
+      "originalTransaction": { "date": "01/04/2024", "description": "Rent Payment NEFT", "amount": 25000 },
+      "reversalTransaction": { "date": "02/04/2024", "description": "NEFT Reversal", "amount": 25000 },
+      "note": "Rent payment reversed next day — confirm if landlord received the funds"
+    }
+  ]
 }
 `;

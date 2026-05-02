@@ -3,22 +3,23 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   AlertTriangle, Lightbulb, CheckCircle2,
-  Calendar, Building2, ChevronDown, Receipt, PiggyBank, Wallet, ListChecks,
+  Calendar, ChevronDown, Receipt, PiggyBank, Wallet, ListChecks,
+  Copy, RotateCcw, Info,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { AnalysisReport, Insight, Currency, SpendCategory } from '../types';
+import { AnalysisReport, Insight, Currency, SpendCategory, DuplicateGroup, ReversalPair } from '../types';
 import { cn } from '../lib/utils';
 
 interface Props { report: AnalysisReport }
 
-const COLORS = ['#13261c', '#10b981', '#d2f34c', '#3b82f6', '#f59e0b', '#ec4899'];
+const COLORS = ['#13261c', '#10b981', '#d2f34c', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
 const INV_COLORS = ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe'];
 
 function fmt(amount: number, currency: Currency) {
-  return `${currency.symbol}${amount.toLocaleString()}`;
+  return `${currency.symbol}${Math.abs(amount).toLocaleString()}`;
 }
 
 export default function ReportDashboard({ report }: Props) {
@@ -28,13 +29,19 @@ export default function ReportDashboard({ report }: Props) {
   const investmentCategories = report.investmentCategories ?? [];
   const categories = report.categories ?? [];
   const topVendors = report.topVendors ?? [];
+  const duplicates = report.duplicateTransactions ?? [];
+  const reversals = report.reversalTransactions ?? [];
   const insightsRef = useRef<HTMLDivElement>(null);
-  const totalSavings = insights.reduce((a, b) => a + (b.impactAmount ?? 0), 0);
-  const netFlow = (report.totalIncome ?? 0) - (report.totalSpend ?? 0) - (report.investmentsTotal ?? 0);
+  const [showNetCalc, setShowNetCalc] = useState(false);
 
-  const scrollToInsights = () => {
-    insightsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const totalSavings = insights.reduce((a, b) => a + (b.impactAmount ?? 0), 0);
+  const income = report.totalIncome ?? 0;
+  const spend = report.totalSpend ?? 0;
+  const investments = report.investmentsTotal ?? 0;
+  const netFlow = income - spend - investments;
+
+  const scrollToInsights = () => insightsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const hasAlerts = duplicates.length > 0 || reversals.length > 0;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -51,7 +58,7 @@ export default function ReportDashboard({ report }: Props) {
             </div>
           </div>
           <p className="text-3xl sm:text-4xl font-bold tracking-tight text-emerald-700 truncate">
-            {fmt(report.totalIncome ?? 0, currency)}
+            {fmt(income, currency)}
           </p>
           <div className="mt-4 space-y-1">
             {incomeSources.slice(0, 2).map((s, i) => (
@@ -72,7 +79,7 @@ export default function ReportDashboard({ report }: Props) {
             </div>
           </div>
           <p className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 truncate">
-            {fmt(report.totalSpend ?? 0, currency)}
+            {fmt(spend, currency)}
           </p>
           <div className="mt-4 flex items-center gap-2">
             <Calendar size={14} className="text-slate-400" />
@@ -80,34 +87,64 @@ export default function ReportDashboard({ report }: Props) {
           </div>
         </div>
 
-        {/* Net Flow */}
-        <div className={cn(
-          'p-6 rounded-3xl shadow-sm',
-          netFlow >= 0 ? 'bg-brand text-white' : 'bg-red-600 text-white'
-        )}>
+        {/* Net Flow — hover to see calculation breakdown */}
+        <div
+          className={cn('p-6 rounded-3xl shadow-sm cursor-default select-none', netFlow >= 0 ? 'bg-brand text-white' : 'bg-red-600 text-white')}
+          onMouseEnter={() => setShowNetCalc(true)}
+          onMouseLeave={() => setShowNetCalc(false)}
+        >
           <div className="flex items-center justify-between mb-4">
             <span className="text-white/60 text-sm font-bold uppercase tracking-wider">Net Cash Flow</span>
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
-              {netFlow >= 0
-                ? <ArrowUpRight size={20} className="text-accent" />
-                : <ArrowDownRight size={20} className="text-red-200" />}
+            <div className="flex items-center gap-2">
+              <Info size={14} className="text-white/40" title="Hover to see calculation" />
+              <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+                {netFlow >= 0
+                  ? <ArrowUpRight size={20} className="text-accent" />
+                  : <ArrowDownRight size={20} className="text-red-200" />}
+              </div>
             </div>
           </div>
           <p className="text-3xl sm:text-4xl font-bold tracking-tight truncate">
-            {netFlow >= 0 ? '+' : ''}{fmt(netFlow, currency)}
+            {netFlow >= 0 ? '+' : '−'}{fmt(netFlow, currency)}
           </p>
-          <p className="mt-4 text-sm text-white/70">
-            {netFlow >= 0
-              ? 'Income exceeds spending this period — good health.'
-              : 'Spending exceeds income this period. Review expenses.'}
-          </p>
+
+          {/* Toggle: description vs calculation breakdown */}
+          <div className="mt-4 min-h-[4.5rem]">
+            {!showNetCalc ? (
+              <div>
+                <p className="text-sm text-white/70">
+                  {netFlow >= 0 ? 'Income exceeds spending this period.' : 'Spending exceeds income this period.'}
+                </p>
+                <p className="text-xs text-white/35 mt-1">Hover to see calculation</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between text-white/80">
+                  <span>Income</span>
+                  <span className="font-mono font-bold text-white">+{fmt(income, currency)}</span>
+                </div>
+                <div className="flex justify-between text-white/80">
+                  <span>Expenses</span>
+                  <span className="font-mono">−{fmt(spend, currency)}</span>
+                </div>
+                {investments > 0 && (
+                  <div className="flex justify-between text-white/80">
+                    <span>Investments</span>
+                    <span className="font-mono">−{fmt(investments, currency)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-1.5 border-t border-white/20 font-bold text-white">
+                  <span>= Net Flow</span>
+                  <span className="font-mono">{netFlow >= 0 ? '+' : '−'}{fmt(netFlow, currency)}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* ── Row 2: Savings Pot + Investments ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {/* Potential Savings — clickable */}
         <button
           onClick={scrollToInsights}
           className="group text-left bg-accent/10 border-2 border-accent/30 hover:border-accent hover:bg-accent/20 p-6 rounded-3xl transition-all"
@@ -127,7 +164,6 @@ export default function ReportDashboard({ report }: Props) {
           </p>
         </button>
 
-        {/* Investments & Savings */}
         <div className="bg-purple-50 border border-purple-100 p-6 rounded-3xl">
           <div className="flex items-center justify-between mb-3">
             <span className="text-purple-700 text-sm font-bold uppercase tracking-wider">Investments & Savings</span>
@@ -136,7 +172,7 @@ export default function ReportDashboard({ report }: Props) {
             </div>
           </div>
           <p className="text-3xl sm:text-4xl font-bold tracking-tight text-purple-900 truncate">
-            {fmt(report.investmentsTotal ?? 0, currency)}
+            {fmt(investments, currency)}
           </p>
           <div className="mt-3 space-y-1">
             {investmentCategories.map((inv, i) => (
@@ -152,6 +188,24 @@ export default function ReportDashboard({ report }: Props) {
         </div>
       </div>
 
+      {/* ── Row 3: Transaction Alerts (duplicates + reversals) ── */}
+      {hasAlerts && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-2xl font-bold tracking-tight text-slate-900">Transaction Alerts</h3>
+            <p className="text-sm text-slate-400 mt-1">Potential duplicate charges and reversed transactions detected in your statement.</p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {duplicates.map((group, i) => (
+              <DuplicateCard key={i} group={group} currency={currency} />
+            ))}
+            {reversals.map((pair, i) => (
+              <ReversalCard key={i} pair={pair} currency={currency} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── Main content: Insights + Charts ── */}
       <div className="grid lg:grid-cols-3 gap-8">
 
@@ -160,8 +214,7 @@ export default function ReportDashboard({ report }: Props) {
           <div>
             <h3 className="text-2xl font-bold tracking-tight text-slate-900">Intelligence & Recommendations</h3>
             <p className="text-sm text-slate-400 mt-1">
-              Based on discretionary spend only. Investments are excluded.
-              Click any card to see supporting transactions.
+              Based on discretionary spend only. Investments are excluded. Click any card to see supporting transactions.
             </p>
           </div>
           <div className="space-y-4">
@@ -186,8 +239,6 @@ export default function ReportDashboard({ report }: Props) {
 
         {/* Right: Charts */}
         <div className="space-y-6">
-
-          {/* Expense breakdown */}
           <h3 className="text-2xl font-bold tracking-tight text-slate-900">Expense Breakdown</h3>
           <div className="bg-white p-6 rounded-3xl border border-emerald-50 shadow-sm space-y-2">
             <div className="h-48 w-full mb-2">
@@ -205,7 +256,6 @@ export default function ReportDashboard({ report }: Props) {
             ))}
           </div>
 
-          {/* Top Vendors */}
           <h3 className="text-2xl font-bold tracking-tight text-slate-900 pt-4">Top Vendors</h3>
           <div className="bg-white p-6 rounded-3xl border border-emerald-50 shadow-sm space-y-4">
             <div className="h-48 w-full mb-6">
@@ -234,6 +284,131 @@ export default function ReportDashboard({ report }: Props) {
   );
 }
 
+// ─── Duplicate Transaction Card ───────────────────────────────────────────────
+
+const DuplicateCard: React.FC<{ group: DuplicateGroup; currency: Currency }> = ({ group, currency }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left p-5 flex gap-4 items-start hover:brightness-95 transition-all cursor-pointer"
+      >
+        <div className="w-11 h-11 rounded-xl bg-amber-400 flex items-center justify-center shrink-0 text-white">
+          <Copy size={20} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <h4 className="text-base font-bold text-slate-900">Possible Duplicate Charge</h4>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-200 text-amber-800">
+                {fmt(group.amount, currency)} × {group.transactions.length}
+              </span>
+              <ChevronDown size={15} className={cn('text-slate-400 transition-transform duration-150', expanded && 'rotate-180')} />
+            </div>
+          </div>
+          <p className="text-sm text-slate-600 leading-relaxed">{group.reason}</p>
+          <p className="text-xs text-amber-700 mt-1 font-medium">{group.daysBetween === 0 ? 'Same day' : `${group.daysBetween} day${group.daysBetween !== 1 ? 's' : ''} apart`} · {group.transactions.length} transactions · click to review</p>
+        </div>
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.15 }} className="overflow-hidden">
+            <div className="mx-5 mb-5">
+              <div className="rounded-xl overflow-hidden border border-amber-200 bg-white">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800">
+                      <th className="text-left px-4 py-2">Date</th>
+                      <th className="text-left px-4 py-2">Description</th>
+                      <th className="text-right px-4 py-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.transactions.map((tx, i) => (
+                      <tr key={i} className="border-t border-slate-100">
+                        <td className="px-4 py-2.5 text-slate-500 whitespace-nowrap">{tx.date}</td>
+                        <td className="px-4 py-2.5 text-slate-700 font-medium">{tx.description}</td>
+                        <td className="px-4 py-2.5 text-right font-mono font-bold text-amber-700">{fmt(tx.amount, currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-slate-400 mt-2 px-1">Verify with your bank if both charges are legitimate before disputing.</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// ─── Reversal Transaction Card ────────────────────────────────────────────────
+
+const ReversalCard: React.FC<{ pair: ReversalPair; currency: Currency }> = ({ pair, currency }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="rounded-2xl border border-violet-200 bg-violet-50 shadow-sm overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left p-5 flex gap-4 items-start hover:brightness-95 transition-all cursor-pointer"
+      >
+        <div className="w-11 h-11 rounded-xl bg-violet-500 flex items-center justify-center shrink-0 text-white">
+          <RotateCcw size={20} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <h4 className="text-base font-bold text-slate-900">Transaction Reversal</h4>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-violet-200 text-violet-800">
+                {fmt(pair.amount, currency)} reversed
+              </span>
+              <ChevronDown size={15} className={cn('text-slate-400 transition-transform duration-150', expanded && 'rotate-180')} />
+            </div>
+          </div>
+          <p className="text-sm text-slate-600 leading-relaxed">{pair.note}</p>
+          <p className="text-xs text-violet-700 mt-1 font-medium">Original: {pair.originalTransaction.date} · Reversed: {pair.reversalTransaction.date} · click to review</p>
+        </div>
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.15 }} className="overflow-hidden">
+            <div className="mx-5 mb-5 space-y-2">
+              {/* Original charge */}
+              <div className="rounded-xl overflow-hidden border border-violet-200 bg-white">
+                <div className="px-4 py-2 text-xs font-bold uppercase tracking-wider bg-violet-100 text-violet-800">
+                  Original Charge
+                </div>
+                <div className="flex items-center justify-between px-4 py-3 text-sm">
+                  <div>
+                    <p className="font-medium text-slate-700">{pair.originalTransaction.description}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{pair.originalTransaction.date}</p>
+                  </div>
+                  <span className="font-mono font-bold text-red-600">−{fmt(pair.originalTransaction.amount, currency)}</span>
+                </div>
+              </div>
+              {/* Reversal credit */}
+              <div className="rounded-xl overflow-hidden border border-violet-200 bg-white">
+                <div className="px-4 py-2 text-xs font-bold uppercase tracking-wider bg-violet-100 text-violet-800">
+                  Reversal / Refund
+                </div>
+                <div className="flex items-center justify-between px-4 py-3 text-sm">
+                  <div>
+                    <p className="font-medium text-slate-700">{pair.reversalTransaction.description}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{pair.reversalTransaction.date}</p>
+                  </div>
+                  <span className="font-mono font-bold text-emerald-600">+{fmt(pair.reversalTransaction.amount, currency)}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // ─── Category Row ────────────────────────────────────────────────────────────
 
 const CategoryRow: React.FC<{ cat: SpendCategory; color: string; currency: Currency }> = ({ cat, color, currency }) => {
@@ -256,7 +431,6 @@ const CategoryRow: React.FC<{ cat: SpendCategory; color: string; currency: Curre
           <span className="text-xs text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full w-14 text-center">{cat.percentage}%</span>
         </div>
       </button>
-
       <AnimatePresence>
         {expanded && hasTransactions && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.15 }} className="overflow-hidden">
@@ -278,7 +452,7 @@ const CategoryRow: React.FC<{ cat: SpendCategory; color: string; currency: Curre
       </AnimatePresence>
     </div>
   );
-}
+};
 
 // ─── Insight Card ─────────────────────────────────────────────────────────────
 
@@ -324,13 +498,13 @@ const InsightCard: React.FC<{ insight: Insight; currency: Currency }> = ({ insig
                 {insight.transactions!.length} transaction{insight.transactions!.length !== 1 ? 's' : ''}
               </p>
             )}
-            {insight.savingSteps?.length ? (
+            {hasSteps && (
               <p className={cn('text-xs font-medium flex items-center gap-1', colors.hint)}>
                 <ListChecks size={12} />
-                {insight.savingSteps.length} action steps
+                {insight.savingSteps!.length} action steps
               </p>
-            ) : null}
-            {(hasTransactions || insight.savingSteps?.length) && (
+            )}
+            {isExpandable && (
               <p className={cn('text-xs font-medium', colors.hint)}>· click to expand</p>
             )}
           </div>
@@ -341,14 +515,13 @@ const InsightCard: React.FC<{ insight: Insight; currency: Currency }> = ({ insig
         {expanded && isExpandable && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
             <div className="mx-5 mb-5 space-y-3">
-              {/* Action steps */}
-              {insight.savingSteps?.length ? (
+              {hasSteps && (
                 <div className={cn('rounded-xl overflow-hidden border', colors.border)}>
                   <div className={cn('px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2', colors.table)}>
                     <ListChecks size={12} /> Action Steps
                   </div>
                   <ul className="bg-white divide-y divide-slate-50">
-                    {insight.savingSteps.map((step, i) => (
+                    {insight.savingSteps!.map((step, i) => (
                       <li key={i} className="px-4 py-2.5 text-sm text-slate-700 flex items-start gap-2">
                         <span className={cn('font-bold shrink-0 mt-0.5', colors.hint)}>{i + 1}.</span>
                         {step}
@@ -356,9 +529,7 @@ const InsightCard: React.FC<{ insight: Insight; currency: Currency }> = ({ insig
                     ))}
                   </ul>
                 </div>
-              ) : null}
-
-              {/* Transactions */}
+              )}
               {hasTransactions && (
                 <div className={cn('rounded-xl overflow-hidden border', colors.border, 'bg-white')}>
                   <table className="w-full text-sm">
@@ -387,4 +558,4 @@ const InsightCard: React.FC<{ insight: Insight; currency: Currency }> = ({ insig
       </AnimatePresence>
     </div>
   );
-}
+};
