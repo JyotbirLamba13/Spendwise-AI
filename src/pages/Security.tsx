@@ -21,8 +21,8 @@ export default function Security() {
           <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-brand mx-auto mb-4">
             <Lock size={24} />
           </div>
-          <h3 className="text-xl font-bold mb-2">Encryption</h3>
-          <p className="text-slate-500 text-sm leading-relaxed">All data in transit is encrypted using bank-grade TLS. Passwords for protected PDFs never leave your browser.</p>
+          <h3 className="text-xl font-bold mb-2">Client-Side Decryption</h3>
+          <p className="text-slate-500 text-sm leading-relaxed">PDF decryption happens entirely in your browser. Your password and your raw file never leave your device — only the extracted text is sent, over TLS.</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-emerald-50 shadow-sm text-center">
           <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-brand mx-auto mb-4">

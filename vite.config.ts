@@ -13,4 +13,8 @@ export default defineConfig({
   server: {
     hmr: process.env.DISABLE_HMR !== 'true',
   },
+  // pdfjs-dist uses dynamic imports internally — skip pre-bundling to avoid worker resolution issues
+  optimizeDeps: {
+    exclude: ['pdfjs-dist'],
+  },
 });

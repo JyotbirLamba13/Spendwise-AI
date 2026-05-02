@@ -4,6 +4,7 @@ import { Upload, FileText, Lock, Loader2, PlayCircle, AlertCircle, X, Eye, EyeOf
 import { AnalysisReport } from '../types';
 import { cn } from '../lib/utils';
 import { SAMPLE_REPORT } from '../lib/sampleData';
+import { extractTextFromFile, PasswordRequiredError, ScannedPDFError } from '../lib/documentParser';
 
 interface AnalyzerWidgetProps {
   onReportGenerated: (report: AnalysisReport) => void;
@@ -56,27 +57,37 @@ export default function AnalyzerWidget({ onReportGenerated, onNonFinancialDocume
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (needsPassword && password) formData.append('password', password);
-
-      const response = await fetch('/api/parse-document', { method: 'POST', body: formData });
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.error === 'PASSWORD_REQUIRED') {
+      // Step 1: Extract text entirely in the browser — no file or password sent to server
+      let text: string;
+      try {
+        text = await extractTextFromFile(file, needsPassword ? password : undefined);
+      } catch (extractErr: any) {
+        if (extractErr instanceof PasswordRequiredError) {
           setNeedsPassword(true);
           setIsLoading(false);
           return;
         }
-        if (data.error === 'SCAN_DETECTED') {
+        if (extractErr instanceof ScannedPDFError) {
           throw new Error('This PDF looks like a scanned image. Please upload a text-based PDF or CSV.');
         }
+        throw extractErr;
+      }
+
+      // Step 2: Send only the extracted text to the server for AI analysis
+      const response = await fetch('/api/parse-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, fileName: file.name }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
         if (data.error === 'NON_FINANCIAL_DOCUMENT') {
           onNonFinancialDocument?.();
           return;
         }
-        throw new Error(data.message || data.error || 'Failed to process file.');
+        throw new Error(data.message || 'Failed to analyze document.');
       }
 
       onReportGenerated(data.report);
@@ -164,7 +175,7 @@ export default function AnalyzerWidget({ onReportGenerated, onNonFinancialDocume
               <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-bold text-blue-800">This PDF is password protected</p>
-                <p className="text-xs text-blue-600 mt-0.5">Your password is used only to decrypt this file in memory. It is never stored, logged, or transmitted anywhere.</p>
+                <p className="text-xs text-blue-600 mt-0.5">Your password is used only in your browser to unlock the PDF. It is never sent to our servers.</p>
               </div>
             </div>
             <div className="relative">

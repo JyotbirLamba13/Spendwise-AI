@@ -236,7 +236,7 @@ export default function ReportDashboard({ report }: Props) {
 
 // ─── Category Row ────────────────────────────────────────────────────────────
 
-function CategoryRow({ cat, color, currency }: { cat: SpendCategory; color: string; currency: Currency }) {
+const CategoryRow: React.FC<{ cat: SpendCategory; color: string; currency: Currency }> = ({ cat, color, currency }) => {
   const [expanded, setExpanded] = useState(false);
   const hasTransactions = !!cat.transactions?.length;
 
@@ -282,7 +282,7 @@ function CategoryRow({ cat, color, currency }: { cat: SpendCategory; color: stri
 
 // ─── Insight Card ─────────────────────────────────────────────────────────────
 
-function InsightCard({ insight, currency }: { insight: Insight; currency: Currency }) {
+const InsightCard: React.FC<{ insight: Insight; currency: Currency }> = ({ insight, currency }) => {
   const [expanded, setExpanded] = useState(false);
   const Icon = insight.type === 'saving' ? CheckCircle2 : insight.type === 'alert' ? AlertTriangle : Lightbulb;
   const hasTransactions = !!insight.transactions?.length;
