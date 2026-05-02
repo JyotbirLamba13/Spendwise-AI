@@ -7,10 +7,11 @@ import { SAMPLE_REPORT } from '../lib/sampleData';
 
 interface AnalyzerWidgetProps {
   onReportGenerated: (report: AnalysisReport) => void;
+  onNonFinancialDocument?: () => void;
   showDemoOnly?: boolean;
 }
 
-export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false }: AnalyzerWidgetProps) {
+export default function AnalyzerWidget({ onReportGenerated, onNonFinancialDocument, showDemoOnly = false }: AnalyzerWidgetProps) {
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -70,6 +71,10 @@ export default function AnalyzerWidget({ onReportGenerated, showDemoOnly = false
         }
         if (data.error === 'SCAN_DETECTED') {
           throw new Error('This PDF looks like a scanned image. Please upload a text-based PDF or CSV.');
+        }
+        if (data.error === 'NON_FINANCIAL_DOCUMENT') {
+          onNonFinancialDocument?.();
+          return;
         }
         throw new Error(data.message || data.error || 'Failed to process file.');
       }

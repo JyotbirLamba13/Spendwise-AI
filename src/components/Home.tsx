@@ -6,22 +6,33 @@ import ReportDashboard from './ReportDashboard';
 import Features from './Features';
 import FAQ from './FAQ';
 import { AnalysisReport } from '../types';
-import { ShieldCheck, ArrowRight, Hexagon, Triangle, Circle, Square, Box } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Hexagon, Triangle, Circle, Square, Box, FileX, PlayCircle } from 'lucide-react';
 import { SAMPLE_REPORT } from '../lib/sampleData';
 
 export default function Home() {
   const [report, setReport] = useState<AnalysisReport | null>(null);
+  const [nonFinancialDoc, setNonFinancialDoc] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
-    if (report) {
+    if (report || nonFinancialDoc) {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
-  }, [report]);
+  }, [report, nonFinancialDoc]);
 
   const handleReportGenerated = (newReport: AnalysisReport) => {
     setReport(newReport);
+    setNonFinancialDoc(false);
     setIsAnalyzing(false);
+  };
+
+  const handleNonFinancialDocument = () => {
+    setNonFinancialDoc(true);
+  };
+
+  const handleBack = () => {
+    setReport(null);
+    setNonFinancialDoc(false);
   };
 
   const loadSampleReport = () => {
@@ -31,7 +42,7 @@ export default function Home() {
   return (
     <>
       <AnimatePresence>
-        {!report && (
+        {!report && !nonFinancialDoc && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, y: -20 }}
@@ -67,7 +78,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                <AnalyzerWidget onReportGenerated={handleReportGenerated} />
+                <AnalyzerWidget onReportGenerated={handleReportGenerated} onNonFinancialDocument={handleNonFinancialDocument} />
                 
                 <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-center text-emerald-200/80 text-sm font-medium">
                   <div className="flex items-center gap-2">
@@ -116,6 +127,53 @@ export default function Home() {
         )}
       </AnimatePresence>
 
+      {nonFinancialDoc && (
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="pb-24 bg-slate-50 min-h-screen"
+        >
+          <div className="max-w-2xl mx-auto px-6 pt-12">
+            <button
+              onClick={handleBack}
+              className="mb-12 flex items-center gap-2 text-slate-500 hover:text-brand transition-colors text-sm font-medium bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100"
+            >
+              <ArrowRight className="rotate-180" size={16} />
+              Back to analyzer
+            </button>
+            <div className="text-center">
+              <div className="w-20 h-20 bg-amber-50 border-2 border-amber-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <FileX size={36} className="text-amber-500" />
+              </div>
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-4">
+                No financial data found
+              </h2>
+              <p className="text-slate-500 text-lg leading-relaxed mb-3">
+                The document you uploaded doesn't appear to be a bank statement or financial transaction record.
+              </p>
+              <p className="text-slate-400 text-sm mb-10">
+                Clearspend works with bank statements, account exports, and transaction history (PDF or CSV). Try uploading a different document.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={handleBack}
+                  className="px-8 py-3 rounded-full font-bold border-2 border-slate-200 text-slate-700 hover:border-brand hover:text-brand transition-colors"
+                >
+                  Upload a different file
+                </button>
+                <button
+                  onClick={loadSampleReport}
+                  className="px-8 py-3 rounded-full font-bold bg-brand text-white flex items-center justify-center gap-2 hover:bg-emerald-900 transition-colors"
+                >
+                  <PlayCircle size={18} />
+                  View sample report
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {report && (
         <motion.div
           id="report-section"
@@ -124,8 +182,8 @@ export default function Home() {
           className="pb-24 bg-slate-50 min-h-screen"
         >
           <div className="max-w-7xl mx-auto px-6 pt-12">
-            <button 
-              onClick={() => setReport(null)}
+            <button
+              onClick={handleBack}
               className="mb-8 flex items-center gap-2 text-slate-500 hover:text-brand transition-colors text-sm font-medium bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100"
             >
               <ArrowRight className="rotate-180" size={16} />

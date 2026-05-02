@@ -22,10 +22,15 @@ function fmt(amount: number, currency: Currency) {
 }
 
 export default function ReportDashboard({ report }: Props) {
-  const { currency } = report;
+  const currency = report.currency ?? { symbol: '$', code: 'USD' };
+  const insights = report.insights ?? [];
+  const incomeSources = report.incomeSources ?? [];
+  const investmentCategories = report.investmentCategories ?? [];
+  const categories = report.categories ?? [];
+  const topVendors = report.topVendors ?? [];
   const insightsRef = useRef<HTMLDivElement>(null);
-  const totalSavings = report.insights.reduce((a, b) => a + b.impactAmount, 0);
-  const netFlow = report.totalIncome - report.totalSpend - report.investmentsTotal;
+  const totalSavings = insights.reduce((a, b) => a + (b.impactAmount ?? 0), 0);
+  const netFlow = (report.totalIncome ?? 0) - (report.totalSpend ?? 0) - (report.investmentsTotal ?? 0);
 
   const scrollToInsights = () => {
     insightsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -46,10 +51,10 @@ export default function ReportDashboard({ report }: Props) {
             </div>
           </div>
           <p className="text-3xl sm:text-4xl font-bold tracking-tight text-emerald-700 truncate">
-            {fmt(report.totalIncome, currency)}
+            {fmt(report.totalIncome ?? 0, currency)}
           </p>
           <div className="mt-4 space-y-1">
-            {report.incomeSources.slice(0, 2).map((s, i) => (
+            {incomeSources.slice(0, 2).map((s, i) => (
               <div key={i} className="flex justify-between text-xs text-slate-500">
                 <span className="truncate max-w-[150px]">{s.name}</span>
                 <span className="font-semibold">{fmt(s.total, currency)}</span>
@@ -67,7 +72,7 @@ export default function ReportDashboard({ report }: Props) {
             </div>
           </div>
           <p className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 truncate">
-            {fmt(report.totalSpend, currency)}
+            {fmt(report.totalSpend ?? 0, currency)}
           </p>
           <div className="mt-4 flex items-center gap-2">
             <Calendar size={14} className="text-slate-400" />
@@ -131,10 +136,10 @@ export default function ReportDashboard({ report }: Props) {
             </div>
           </div>
           <p className="text-3xl sm:text-4xl font-bold tracking-tight text-purple-900 truncate">
-            {fmt(report.investmentsTotal, currency)}
+            {fmt(report.investmentsTotal ?? 0, currency)}
           </p>
           <div className="mt-3 space-y-1">
-            {report.investmentCategories.map((inv, i) => (
+            {investmentCategories.map((inv, i) => (
               <div key={i} className="flex justify-between text-xs text-purple-700">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: INV_COLORS[i % INV_COLORS.length] }} />
@@ -160,7 +165,7 @@ export default function ReportDashboard({ report }: Props) {
             </p>
           </div>
           <div className="space-y-4">
-            {report.insights.map((insight, idx) => (
+            {insights.map((insight, idx) => (
               <InsightCard key={idx} insight={insight} currency={currency} />
             ))}
           </div>
@@ -188,14 +193,14 @@ export default function ReportDashboard({ report }: Props) {
             <div className="h-48 w-full mb-2">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={report.categories} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="total" stroke="none">
-                    {report.categories.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  <Pie data={categories} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="total" stroke="none">
+                    {categories.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip formatter={(v: number) => fmt(v, currency)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            {report.categories.map((cat, i) => (
+            {categories.map((cat, i) => (
               <CategoryRow key={i} cat={cat} color={COLORS[i % COLORS.length]} currency={currency} />
             ))}
           </div>
@@ -205,18 +210,18 @@ export default function ReportDashboard({ report }: Props) {
           <div className="bg-white p-6 rounded-3xl border border-emerald-50 shadow-sm space-y-4">
             <div className="h-48 w-full mb-6">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={report.topVendors} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
+                <BarChart data={topVendors} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                   <XAxis type="number" hide />
                   <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} width={80} />
                   <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(v: number) => fmt(v, currency)} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={20}>
-                    {report.topVendors.map((_, i) => <Cell key={i} fill={i === 0 ? '#13261c' : '#10b981'} />)}
+                    {topVendors.map((_, i) => <Cell key={i} fill={i === 0 ? '#13261c' : '#10b981'} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            {report.topVendors.map((v, i) => (
+            {topVendors.map((v, i) => (
               <div key={i} className="flex justify-between items-center pb-3 border-b border-slate-50 last:border-0 last:pb-0">
                 <span className="font-bold text-slate-700 text-sm truncate">{v.name}</span>
                 <span className="font-mono text-sm">{fmt(v.total, currency)}</span>

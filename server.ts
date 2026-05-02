@@ -161,6 +161,12 @@ async function startServer() {
         // ── Analyze with Gemini ──
         try {
           const report = await analyzeWithGemini(text);
+          if (report.isFinancialDocument === false) {
+            return res.status(422).json({
+              error: 'NON_FINANCIAL_DOCUMENT',
+              message: 'This document does not appear to be a bank statement or financial transaction record.',
+            });
+          }
           res.json({ report, fileName: originalname });
         } catch (aiError: any) {
           console.error('AI analysis error:', aiError.message);

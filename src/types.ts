@@ -31,6 +31,7 @@ export interface Vendor {
 }
 
 export interface AnalysisReport {
+  isFinancialDocument?: boolean;        // false if document is not a bank/transaction record
   currency: Currency;
   totalSpend: number;       // true discretionary expenses only
   totalIncome: number;      // all credits / salary / transfers in
@@ -45,7 +46,12 @@ export interface AnalysisReport {
 }
 
 export const SYSTEM_PROMPT = `
-You are a world-class financial analyst. Analyze the bank statement and return ONLY valid JSON. No markdown, no explanation, no text outside JSON.
+You are a world-class financial analyst. Analyze the document and return ONLY valid JSON. No markdown, no explanation, no text outside JSON.
+
+━━━ DOCUMENT VALIDATION (check this FIRST) ━━━
+Determine if this document contains bank or financial transaction data (account debits, credits, transaction history, account statements).
+- If it is NOT a bank statement or transaction record (e.g. plain text article, cost of attendance, admission brochure, fee schedule, course catalog, manual, invoice without transaction history, random text): return ONLY { "isFinancialDocument": false }
+- If it IS bank/financial transaction data: set "isFinancialDocument": true and proceed with the full analysis below.
 
 ━━━ CURRENCY ━━━
 Detect from symbols (₹ $ € £) or text (INR USD EUR GBP Rs.). Default: { "symbol": "$", "code": "USD" }
@@ -76,6 +82,7 @@ SIP, mutual fund, PPF, NPS, EPF, insurance premium, recurring deposit, fixed dep
 
 ━━━ OUTPUT FORMAT ━━━
 {
+  "isFinancialDocument": true,
   "currency": { "symbol": "₹", "code": "INR" },
   "totalIncome": 0,
   "totalSpend": 0,
