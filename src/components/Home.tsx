@@ -6,7 +6,7 @@ import ReportDashboard from './ReportDashboard';
 import Features from './Features';
 import FAQ from './FAQ';
 import { AnalysisReport } from '../types';
-import { ShieldCheck, ArrowRight, Hexagon, Triangle, Circle, Square, Box, FileX, PlayCircle } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Hexagon, Triangle, Circle, Square, Box, FileX } from 'lucide-react';
 import { SAMPLE_REPORT } from '../lib/sampleData';
 
 export default function Home() {
@@ -136,40 +136,30 @@ export default function Home() {
           <div className="max-w-2xl mx-auto px-6 pt-12">
             <button
               onClick={handleBack}
-              className="mb-12 flex items-center gap-2 text-slate-500 hover:text-brand transition-colors text-sm font-medium bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100"
+              className="mb-10 flex items-center gap-2 text-slate-500 hover:text-brand transition-colors text-sm font-medium bg-white px-4 py-2 rounded-full shadow-sm border border-slate-100"
             >
               <ArrowRight className="rotate-180" size={16} />
-              Back to analyzer
+              Back to home
             </button>
-            <div className="text-center">
-              <div className="w-20 h-20 bg-amber-50 border-2 border-amber-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                <FileX size={36} className="text-amber-500" />
+
+            {/* Error banner */}
+            <div className="flex items-start gap-4 bg-amber-50 border border-amber-100 rounded-3xl p-6 mb-8">
+              <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center shrink-0">
+                <FileX size={24} className="text-amber-600" />
               </div>
-              <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-4">
-                No financial data found
-              </h2>
-              <p className="text-slate-500 text-lg leading-relaxed mb-3">
-                The document you uploaded doesn't appear to be a bank statement or financial transaction record.
-              </p>
-              <p className="text-slate-400 text-sm mb-10">
-                Clearspend works with bank statements, account exports, and transaction history (PDF or CSV). Try uploading a different document.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
-                  onClick={handleBack}
-                  className="px-8 py-3 rounded-full font-bold border-2 border-slate-200 text-slate-700 hover:border-brand hover:text-brand transition-colors"
-                >
-                  Upload a different file
-                </button>
-                <button
-                  onClick={loadSampleReport}
-                  className="px-8 py-3 rounded-full font-bold bg-brand text-white flex items-center justify-center gap-2 hover:bg-emerald-900 transition-colors"
-                >
-                  <PlayCircle size={18} />
-                  View sample report
-                </button>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 mb-1">No financial data found</h2>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  That document doesn't appear to be a bank statement or transaction record. Upload a bank statement, account export, or CSV of transactions below.
+                </p>
               </div>
             </div>
+
+            {/* Inline upload widget — try again without going back */}
+            <AnalyzerWidget
+              onReportGenerated={handleReportGenerated}
+              onNonFinancialDocument={handleNonFinancialDocument}
+            />
           </div>
         </motion.div>
       )}

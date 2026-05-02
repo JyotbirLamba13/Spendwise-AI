@@ -7,7 +7,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 ).href;
 
 const MAX_PAGES = 50;
-const MAX_CHARS = 80_000; // generous; server truncates to 12k before sending to AI
+const MAX_CHARS = 120_000; // server truncates before AI; keep plenty here
 
 export class PasswordRequiredError extends Error {
   constructor() {
@@ -62,16 +62,32 @@ async function extractFromPDF(file: File, password?: string): Promise<string> {
   }
 
   const pageCount = Math.min(pdf.numPages, MAX_PAGES);
-  let text = '';
+  let fullText = '';
 
   for (let i = 1; i <= pageCount; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    text += content.items.map((item: any) => ('str' in item ? item.str : '')).join(' ') + '\n';
-    if (text.length >= MAX_CHARS) break;
+
+    // Preserve line structure using hasEOL markers — critical for bank statement tables
+    // where each transaction row must stay on its own line for the AI to parse correctly.
+    let lineBuffer = '';
+    for (const item of content.items as any[]) {
+      if (!('str' in item)) continue;
+      lineBuffer += item.str;
+      if (item.hasEOL) {
+        fullText += lineBuffer.trimEnd() + '\n';
+        lineBuffer = '';
+      } else {
+        lineBuffer += ' ';
+      }
+    }
+    if (lineBuffer.trim()) fullText += lineBuffer.trimEnd() + '\n';
+    fullText += '\n'; // blank line between pages
+
+    if (fullText.length >= MAX_CHARS) break;
   }
 
-  const trimmed = text.trim();
+  const trimmed = fullText.trim();
   if (trimmed.length < 30) throw new ScannedPDFError();
 
   return trimmed.slice(0, MAX_CHARS);

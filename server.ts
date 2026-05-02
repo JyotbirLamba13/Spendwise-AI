@@ -53,7 +53,8 @@ async function analyzeWithGroq(text: string): Promise<AnalysisReport> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('Service configuration error.');
 
-  const cleanedText = text.slice(0, 12_000);
+  // Keep more context for richer analysis — llama-3.3-70b supports 128k tokens
+  const cleanedText = text.slice(0, 24_000);
 
   let response: Response;
   try {
@@ -67,9 +68,10 @@ async function analyzeWithGroq(text: string): Promise<AnalysisReport> {
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Analyze this bank statement and return STRICT JSON only:\n\n${cleanedText}` },
+          { role: 'user', content: `Analyze this bank statement thoroughly and return complete JSON only:\n\n${cleanedText}` },
         ],
-        temperature: 0.2,
+        temperature: 0.1,
+        max_tokens: 6000,
         response_format: { type: 'json_object' },
       }),
     });
