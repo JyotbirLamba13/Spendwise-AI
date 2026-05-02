@@ -3,23 +3,65 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ClearSpend | AI-Powered Financial Intelligence</title>
-    <meta name="description" content="ClearSpend is a privacy-first AI platform that analyzes your bank statements to detect SaaS creep, hidden burn rates, and provides actionable cost-cutting insights." />
-    <meta name="keywords" content="AI finance, SaaS spend analysis, autonomous CFO, financial operations, expense reduction" />
-    
-    <!-- Open Graph for Social Sharing -->
-    <meta property="og:title" content="ClearSpend | AI-Powered Financial Intelligence" />
-    <meta property="og:description" content="Instantly analyze bank statements securely in your browser to identify hidden spend, eliminate SaaS creep, and optimize your runway." />
+
+    <!-- ── Favicon ── -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <meta name="theme-color" content="#13261c" />
+
+    <!-- ── Primary SEO ── -->
+    <title>ClearSpend — AI Bank Statement Analyzer</title>
+    <meta name="description" content="Upload your bank statement and ClearSpend instantly identifies hidden SaaS spend, duplicate charges, and cash flow leaks — 100% private, processed in your browser." />
+    <meta name="keywords" content="bank statement analyzer, SaaS spend analysis, expense tracker, financial intelligence, AI finance, cost savings, subscription audit, cash flow" />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="ClearSpend" />
+
+    <!-- ── Open Graph (LinkedIn, WhatsApp, Slack previews) ── -->
     <meta property="og:type" content="website" />
-    
-    <!-- Twitter Card -->
+    <meta property="og:site_name" content="ClearSpend" />
+    <meta property="og:title" content="ClearSpend — AI Bank Statement Analyzer" />
+    <meta property="og:description" content="Upload your bank statement and ClearSpend instantly identifies hidden SaaS spend, duplicate charges, and cash flow leaks — 100% private, processed in your browser." />
+    <meta property="og:url" content="https://clearspend.app" />
+    <meta property="og:image" content="https://clearspend.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ClearSpend — AI-powered bank statement analyzer dashboard" />
+
+    <!-- ── Twitter / X Card ── -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="ClearSpend | AI-Powered Financial Intelligence" />
-    <meta name="twitter:description" content="Instantly analyze bank statements securely in your browser to identify hidden spend, eliminate SaaS creep, and optimize your runway." />
+    <meta name="twitter:site" content="@clearspend" />
+    <meta name="twitter:title" content="ClearSpend — AI Bank Statement Analyzer" />
+    <meta name="twitter:description" content="Upload your bank statement and ClearSpend instantly identifies hidden SaaS spend, duplicate charges, and cash flow leaks — 100% private, processed in your browser." />
+    <meta name="twitter:image" content="https://clearspend.app/og-image.png" />
+    <meta name="twitter:image:alt" content="ClearSpend dashboard showing spending categories and insights" />
+
+    <!-- ── Structured Data (JSON-LD) ── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "ClearSpend",
+      "url": "https://clearspend.app",
+      "description": "AI-powered bank statement analyzer that identifies hidden SaaS spend, duplicate charges, and cash flow leaks. 100% private — processed in your browser.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Bank statement analysis",
+        "SaaS spend detection",
+        "Duplicate transaction detection",
+        "Cash flow insights",
+        "Privacy-first processing"
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
